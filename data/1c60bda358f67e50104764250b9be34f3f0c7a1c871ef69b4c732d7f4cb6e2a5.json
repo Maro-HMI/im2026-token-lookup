@@ -1,0 +1,84 @@
+{
+  "student_hash": "1c60bda358f67e50104764250b9be34f3f0c7a1c871ef69b4c732d7f4cb6e2a5",
+  "last_updated": "2026-10-03T13:33:37.068079+00:00",
+  "courses": {
+    "GETXR": {
+      "enrolled": true,
+      "base": 2.0,
+      "earned": 0.5,
+      "spent": 2.0,
+      "balance": 0.5,
+      "transactions": [
+        {
+          "date": "2026-09-01",
+          "type": "BASE",
+          "delta": 2.0,
+          "reason": "Initial Starting Allocation"
+        },
+        {
+          "date": "2026-09-11",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S2"
+        },
+        {
+          "date": "2026-09-21",
+          "type": "SPENT",
+          "delta": -1.0,
+          "reason": "A2 late sub (0.9 days)"
+        },
+        {
+          "date": "2026-09-29",
+          "type": "SPENT",
+          "delta": -1.0,
+          "reason": "A3 late sub (0.9 days)"
+        }
+      ]
+    },
+    "3DMA": {
+      "enrolled": true,
+      "base": 2.0,
+      "earned": 2.5,
+      "spent": 1.0,
+      "balance": 3.5,
+      "transactions": [
+        {
+          "date": "2026-09-01",
+          "type": "BASE",
+          "delta": 2.0,
+          "reason": "Initial Starting Allocation"
+        },
+        {
+          "date": "2026-09-11",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S2"
+        },
+        {
+          "date": "2026-09-11",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S3"
+        },
+        {
+          "date": "2026-09-19",
+          "type": "ADJUSTMENT",
+          "delta": 1.0,
+          "reason": "Extra day for wrapping up!"
+        },
+        {
+          "date": "2026-09-21",
+          "type": "SPENT",
+          "delta": -1.0,
+          "reason": "A1 late sub (0.8 days late)"
+        },
+        {
+          "date": "2026-09-28",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S7"
+        }
+      ]
+    }
+  }
+}

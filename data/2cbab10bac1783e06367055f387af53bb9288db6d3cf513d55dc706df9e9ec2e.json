@@ -1,0 +1,78 @@
+{
+  "student_hash": "2cbab10bac1783e06367055f387af53bb9288db6d3cf513d55dc706df9e9ec2e",
+  "last_updated": "2026-10-03T13:33:37.068079+00:00",
+  "courses": {
+    "GETXR": {
+      "enrolled": true,
+      "base": 2.0,
+      "earned": 0.5,
+      "spent": 2.0,
+      "balance": 0.5,
+      "transactions": [
+        {
+          "date": "2026-09-01",
+          "type": "BASE",
+          "delta": 2.0,
+          "reason": "Initial Starting Allocation"
+        },
+        {
+          "date": "2026-09-11",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S2"
+        },
+        {
+          "date": "2026-09-21",
+          "type": "SPENT",
+          "delta": -1.0,
+          "reason": "A2 late sub (0.6 days)"
+        },
+        {
+          "date": "2026-09-29",
+          "type": "SPENT",
+          "delta": -1.0,
+          "reason": "A3 late sub"
+        }
+      ]
+    },
+    "3DMA": {
+      "enrolled": true,
+      "base": 2.0,
+      "earned": 2.0,
+      "spent": 4.0,
+      "balance": 0.0,
+      "transactions": [
+        {
+          "date": "2026-09-01",
+          "type": "BASE",
+          "delta": 2.0,
+          "reason": "Initial Starting Allocation"
+        },
+        {
+          "date": "2026-09-11",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S3"
+        },
+        {
+          "date": "2026-09-14",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S4"
+        },
+        {
+          "date": "2026-09-19",
+          "type": "ADJUSTMENT",
+          "delta": 1.0,
+          "reason": "Extra day for wrapping up!"
+        },
+        {
+          "date": "2026-09-24",
+          "type": "SPENT",
+          "delta": -4.0,
+          "reason": "A1 late sub (3.9 days late)"
+        }
+      ]
+    }
+  }
+}
