@@ -1,0 +1,102 @@
+{
+  "student_hash": "45731a3695bb363971c353cac4f808c6ba224189f8a5c24323838a372b4906ef",
+  "last_updated": "2026-10-09T15:41:13.747947+00:00",
+  "courses": {
+    "GETXR": {
+      "enrolled": true,
+      "base": 2.0,
+      "earned": 2.5,
+      "spent": 0.0,
+      "balance": 4.5,
+      "transactions": [
+        {
+          "date": "2026-09-01",
+          "type": "BASE",
+          "delta": 2.0,
+          "reason": "Initial Starting Allocation"
+        },
+        {
+          "date": "2026-09-11",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S2"
+        },
+        {
+          "date": "2026-09-14",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S4"
+        },
+        {
+          "date": "2026-09-18",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S5"
+        },
+        {
+          "date": "2026-09-21",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S6"
+        },
+        {
+          "date": "2026-09-28",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S8"
+        }
+      ]
+    },
+    "3DMA": {
+      "enrolled": true,
+      "base": 2.0,
+      "earned": 3.5,
+      "spent": 0.0,
+      "balance": 5.5,
+      "transactions": [
+        {
+          "date": "2026-09-01",
+          "type": "BASE",
+          "delta": 2.0,
+          "reason": "Initial Starting Allocation"
+        },
+        {
+          "date": "2026-09-11",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S2"
+        },
+        {
+          "date": "2026-09-11",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S3"
+        },
+        {
+          "date": "2026-09-14",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S4"
+        },
+        {
+          "date": "2026-09-19",
+          "type": "ADJUSTMENT",
+          "delta": 1.0,
+          "reason": "Extra day for wrapping up!"
+        },
+        {
+          "date": "2026-09-21",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S5"
+        },
+        {
+          "date": "2026-09-28",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S7"
+        }
+      ]
+    }
+  }
+}
