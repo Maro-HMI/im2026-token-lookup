@@ -1,0 +1,31 @@
+{
+  "student_hash": "e07938a83ef1c6ff2413e2b9b7dc4515d365f135e703079a624cc79b776d70a1",
+  "last_updated": "2026-09-15T16:01:13.159102+00:00",
+  "courses": {
+    "GETXR": {
+      "enrolled": false,
+      "reason": "Not enrolled in this course."
+    },
+    "3DMA": {
+      "enrolled": true,
+      "base": 2.0,
+      "earned": 0.5,
+      "spent": 0.0,
+      "balance": 2.5,
+      "transactions": [
+        {
+          "date": "2026-09-15",
+          "type": "BASE",
+          "delta": 2.0,
+          "reason": "Initial Starting Allocation"
+        },
+        {
+          "date": "2026-09-14",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S4"
+        }
+      ]
+    }
+  }
+}
