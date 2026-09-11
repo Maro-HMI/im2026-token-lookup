@@ -1,0 +1,915 @@
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --border: #e2e8f0;
+  --primary: #2563eb;
+  --font-sans: "General Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", Menlo, monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.font-heading {
+  font-family: "General Sans", sans-serif;
+}
+
+/* Full-Screen Particle Canvas */
+#fxCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 900;
+}
+
+/* Base Transitions */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ==========================================================================
+   Juicy Mode Animations (Spring Physics, Glows, Staggers)
+   ========================================================================== */
+
+/* Button Squish & Spring Pop */
+body.juicy-mode #submitBtn {
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease, box-shadow 0.18s ease;
+}
+
+@media (hover: hover) {
+  body.juicy-mode #submitBtn:hover {
+    transform: translateY(-1px) scale(1.02);
+    box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.35);
+  }
+
+  body.juicy-mode #submitBtn:hover::after {
+    left: 140%;
+    transition: left 0.75s ease-in-out;
+  }
+
+  #modeToggleBtn:hover {
+    transform: scale(1.05);
+  }
+}
+
+body.juicy-mode #submitBtn:active {
+  transform: translateY(1px) scale(0.94);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+}
+
+/* Shimmer Sweep on Button */
+body.juicy-mode #submitBtn::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -75%;
+  width: 50%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(25deg);
+  pointer-events: none;
+  transition: none;
+}
+
+/* Springy Input Focus */
+body.juicy-mode .search-input-wrap {
+  transition: border-color 0.2s ease, box-shadow 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.2s ease;
+}
+
+body.juicy-mode .search-input-wrap:focus-within {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15), 0 4px 12px -2px rgba(15, 23, 42, 0.08);
+}
+
+/* Card Spring Entrances */
+body.juicy-mode #cardGetxr {
+  animation: springCard 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+}
+
+body.juicy-mode #card3dma {
+  animation: springCard 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) 0.07s forwards;
+  opacity: 0;
+}
+
+@keyframes springCard {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Highscore Aura Glow (for balances >= 2.5) */
+body.juicy-mode .aura-glow-gold {
+  box-shadow: 0 0 0 1.5px rgba(234, 179, 8, 0.5), 0 8px 24px -4px rgba(234, 179, 8, 0.2);
+  transition: box-shadow 0.3s ease;
+}
+
+body.juicy-mode .aura-glow-indigo {
+  box-shadow: 0 0 0 1.5px rgba(99, 102, 241, 0.5), 0 8px 24px -4px rgba(99, 102, 241, 0.2);
+  transition: box-shadow 0.3s ease;
+}
+
+/* Number Pop Animation */
+@keyframes numberPop {
+  0% {
+    transform: scale(0.92);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+body.juicy-mode .pop-number {
+  display: inline-block;
+  animation: numberPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Staggered Activity Ledger Items */
+body.juicy-mode .ledger-item {
+  animation: ledgerSlideIn 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation-delay: calc(var(--item-idx, 0) * 45ms);
+  opacity: 0;
+}
+
+@keyframes ledgerSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Earned Token Glow Pulse */
+body.juicy-mode .stat-pulse-green {
+  animation: greenPulse 0.6s ease-out;
+}
+
+@keyframes greenPulse {
+  0% {
+    background-color: rgba(16, 185, 129, 0.25);
+    transform: scale(1.04);
+  }
+  100% {
+    background-color: #ffffff;
+    transform: scale(1);
+  }
+}
+
+/* Mode Toggle Button */
+#modeToggleBtn {
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#modeToggleBtn:hover {
+  transform: scale(1.05);
+}
+
+#modeToggleBtn:active {
+  transform: scale(0.95);
+}
+
+/* ==========================================================================
+   Micro-Interactions & Easter Egg Animations
+   ========================================================================== */
+
+/* Coin Flip on Balance Click */
+@keyframes coinFlip {
+  0% { transform: perspective(500px) rotateY(0deg) scale(1); }
+  50% { transform: perspective(500px) rotateY(180deg) scale(1.25); }
+  100% { transform: perspective(500px) rotateY(360deg) scale(1); }
+}
+
+.coin-flip,
+body.juicy-mode .coin-flip,
+body.vanilla-mode .coin-flip {
+  display: inline-block !important;
+  animation: coinFlip 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  transform-style: preserve-3d !important;
+  will-change: transform;
+}
+
+/* Golden Ticket Spin */
+@keyframes ticketSpin {
+  0% { transform: scale(1) rotate(0deg); }
+  35% { transform: scale(1.3) rotate(-15deg); }
+  75% { transform: scale(1.15) rotate(375deg); }
+  100% { transform: scale(1) rotate(360deg); }
+}
+
+.ticket-spin {
+  display: inline-block !important;
+  animation: ticketSpin 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  transform-origin: center center;
+}
+
+/* Course Logo Bobble */
+@keyframes logoBobble {
+  0% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.25) rotate(-15deg); }
+  50% { transform: scale(1.2) rotate(15deg); }
+  75% { transform: scale(1.1) rotate(-8deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.logo-bobble {
+  animation: logoBobble 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  transform-origin: center center;
+}
+
+/* Achievement Badge Click Pulse */
+@keyframes badgeBounce {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.08); }
+  70% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+.badge-celebrate {
+  animation: badgeBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+/* Barrel Roll */
+@keyframes barrelRoll {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.barrel-rolling {
+  animation: barrelRoll 1.3s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  transform-origin: center center;
+}
+
+/* 3D Card Tilt & Specular Glint (Juicy Mode Desktop) */
+@media (hover: hover) {
+  body.juicy-mode #cardGetxr,
+  body.juicy-mode #card3dma {
+    position: relative;
+    overflow: hidden;
+    transform-style: preserve-3d;
+    transition: transform 0.12s ease-out, box-shadow 0.2s ease-out;
+  }
+
+  body.juicy-mode #cardGetxr.tilt-card-reset,
+  body.juicy-mode #card3dma.tilt-card-reset {
+    transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.5s ease;
+    transform: perspective(1200px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1);
+  }
+
+  .card-glint {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    border-radius: inherit;
+    background: radial-gradient(circle 280px at var(--glint-x, 50%) var(--glint-y, 50%), rgba(255, 255, 255, 0.25), transparent 80%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    mix-blend-mode: overlay;
+  }
+
+  body.juicy-mode #cardGetxr:hover .card-glint,
+  body.juicy-mode #card3dma:hover .card-glint {
+    opacity: 1;
+  }
+}
+
+/* Card Drag & Reorder (Juicy Mode) */
+body.juicy-mode #cardGetxr,
+body.juicy-mode #card3dma {
+  cursor: default;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  will-change: transform;
+}
+
+body.juicy-mode #cardGetxr.card-dragging,
+body.juicy-mode #card3dma.card-dragging {
+  cursor: default !important;
+  z-index: 950 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: none !important;
+  transition: none !important;
+}
+
+body.juicy-mode #cardGetxr.card-dragging {
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 2px rgba(234, 179, 8, 0.6) !important;
+}
+
+body.juicy-mode #cardGetxr.aura-glow-gold.card-dragging {
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 2px rgba(234, 179, 8, 0.8), 0 8px 24px -4px rgba(234, 179, 8, 0.35) !important;
+}
+
+body.juicy-mode #card3dma.card-dragging {
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 2px rgba(99, 102, 241, 0.4) !important;
+}
+
+body.juicy-mode #card3dma.aura-glow-indigo.card-dragging {
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 2px rgba(99, 102, 241, 0.75), 0 8px 24px -4px rgba(99, 102, 241, 0.35) !important;
+}
+
+body.juicy-mode .card-swapping {
+  pointer-events: none;
+  z-index: 950 !important;
+}
+
+/* Interactive Micro-Interactions (Juicy Mode Only) */
+body.juicy-mode #headerTicketIcon,
+body.juicy-mode #getxrLogo,
+body.juicy-mode #threedmaLogo {
+  cursor: pointer !important;
+  transition: transform 0.2s ease;
+}
+
+body.juicy-mode #headerTicketIcon:hover,
+body.juicy-mode #getxrLogo:hover,
+body.juicy-mode #threedmaLogo:hover {
+  transform: rotate(12deg);
+}
+
+body.juicy-mode #headerTicketIcon:active,
+body.juicy-mode #getxrLogo:active,
+body.juicy-mode #threedmaLogo:active {
+  transform: scale(0.9);
+}
+
+body.juicy-mode #getxrBalance,
+body.juicy-mode #threedmaBalance {
+  cursor: pointer !important;
+  transition: opacity 0.15s ease;
+}
+
+body.juicy-mode #getxrBalance:hover,
+body.juicy-mode #threedmaBalance:hover {
+  opacity: 0.75;
+}
+
+body.juicy-mode #cardGetxr button,
+body.juicy-mode #card3dma button,
+body.juicy-mode #cardGetxr a,
+body.juicy-mode #card3dma a {
+  cursor: pointer !important;
+}
+
+/* ==========================================================================
+   Vanilla Mode & Reduced Motion Overrides
+   ========================================================================== */
+body.vanilla-mode #headerTicketIcon,
+body.vanilla-mode #getxrLogo,
+body.vanilla-mode #threedmaLogo,
+body.vanilla-mode #getxrBalance,
+body.vanilla-mode #threedmaBalance,
+body.vanilla-mode #cardGetxr,
+body.vanilla-mode #card3dma {
+  cursor: default !important;
+  transform: none !important;
+  opacity: 1 !important;
+  transition: none !important;
+}
+
+body.vanilla-mode #headerTicketIcon:hover,
+body.vanilla-mode #getxrLogo:hover,
+body.vanilla-mode #threedmaLogo:hover,
+body.vanilla-mode #getxrBalance:hover,
+body.vanilla-mode #threedmaBalance:hover,
+body.vanilla-mode #cardGetxr:hover,
+body.vanilla-mode #card3dma:hover {
+  cursor: default !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
+
+body.vanilla-mode #cardGetxr .card-glint,
+body.vanilla-mode #card3dma .card-glint {
+  display: none !important;
+}
+
+body.vanilla-mode #submitBtn,
+body.vanilla-mode #cardGetxr,
+body.vanilla-mode #card3dma,
+body.vanilla-mode .ledger-item,
+body.vanilla-mode .pop-number,
+body.vanilla-mode .coin-flip,
+body.vanilla-mode .ticket-spin,
+body.vanilla-mode .logo-bobble,
+body.vanilla-mode .barrel-rolling {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ==========================================================================
+   Telemetry & Achievement Badge
+   ========================================================================== */
+#eggCounterContainer {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  cursor: default !important;
+}
+
+#eggCounterContainer.achievement-badge {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 14px !important;
+  padding: 8px 24px 8px 10px !important;
+  border-radius: 9999px !important;
+  background: linear-gradient(135deg, #fffdf5 0%, #fef3c7 50%, #fde68a 100%) !important;
+  border: 2px solid #f59e0b !important;
+  box-shadow: 0 4px 18px -2px rgba(245, 158, 11, 0.35), 0 0 0 1px rgba(251, 191, 36, 0.4) !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease !important;
+}
+
+#eggCounterContainer.achievement-badge:hover {
+  transform: scale(1.04);
+  box-shadow: 0 6px 24px -2px rgba(245, 158, 11, 0.5), 0 0 16px 2px rgba(245, 158, 11, 0.35) !important;
+}
+
+#eggCounterContainer.achievement-badge:active {
+  transform: scale(0.97);
+}
+
+.achievement-avatar {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 9999px !important;
+  object-fit: cover !important;
+  border: 2.5px solid #f59e0b !important;
+  box-shadow: 0 2px 8px rgba(180, 83, 9, 0.3) !important;
+  flex-shrink: 0 !important;
+  display: block !important;
+}
+
+.achievement-text-group {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  line-height: 1.25 !important;
+  text-align: left !important;
+}
+
+.achievement-label {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  color: #b45309 !important;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+.achievement-title {
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  color: #451a03 !important;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+body.vanilla-mode #eggCounterContainer,
+body.vanilla-mode .achievement-badge,
+body.vanilla-mode #easterEggToast {
+  display: none !important;
+}
+
+/* Enrolled status badges are grey for both courses in Vanilla mode */
+body.vanilla-mode #getxrStatusBadge,
+body.vanilla-mode #threedmaStatusBadge {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #e2e8f0 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.juicy-mode #submitBtn,
+  body.juicy-mode #cardGetxr,
+  body.juicy-mode #card3dma,
+  body.juicy-mode .ledger-item,
+  body.juicy-mode .pop-number,
+  body.juicy-mode .coin-flip,
+  body.juicy-mode .ticket-spin,
+  body.juicy-mode .logo-bobble,
+  .barrel-rolling {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+  }
+  body.juicy-mode #submitBtn::after {
+    display: none !important;
+  }
+  #fxCanvas {
+    display: none !important;
+  }
+}
+
+/* Custom Scrollbar for Ledger */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ==========================================================================
+   The Void (3D Perspective Sandbox & Walking Experience)
+   ========================================================================== */
+
+#appViewport {
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+body.in-the-void {
+  overflow: hidden !important;
+  background-color: #f8fafc !important;
+  user-select: none;
+}
+
+body.in-the-void #appViewport {
+  perspective: 1100px;
+  perspective-origin: 50% 50%;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#worldRig {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  transform-style: flat;
+}
+
+body.in-the-void #worldRig {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  min-height: 0;
+  display: block;
+  flex-grow: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+#pageCard {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  position: relative;
+  transform-style: flat;
+}
+
+body.in-the-void #pageCard {
+  position: absolute;
+  width: 860px;
+  max-width: 90vw;
+  left: -430px;
+  top: -380px;
+  min-height: 0;
+  height: auto;
+  display: block;
+  flex-grow: 0;
+  transform-style: preserve-3d;
+  box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.08);
+  border-radius: 1.25rem;
+  background: transparent;
+  overflow: visible;
+}
+
+#pageFront {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-grow: 1;
+  background: #f8fafc;
+  border-radius: 0;
+  overflow-x: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(1px);
+}
+
+body.in-the-void #pageFront {
+  min-height: 720px;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.2);
+}
+
+body.in-the-void header {
+  position: relative !important;
+  top: auto !important;
+}
+
+body.in-the-void footer {
+  border-bottom-left-radius: 1.25rem;
+  border-bottom-right-radius: 1.25rem;
+}
+
+/* Token Overclock kinetic effects */
+.token-overclocking {
+  display: inline-block !important;
+  animation: overclockJitter 0.08s infinite alternate !important;
+  color: #ea580c !important;
+  text-shadow: 0 0 16px rgba(234, 88, 12, 0.6), 0 0 30px rgba(245, 158, 11, 0.4) !important;
+}
+
+@keyframes overclockJitter {
+  0% { transform: scale(1.18) rotate(-2deg); }
+  50% { transform: scale(1.24) translate(1px, -1px); }
+  100% { transform: scale(1.18) rotate(2deg); }
+}
+
+/* Floor Grid */
+#voidFloor {
+  display: none;
+}
+
+body.in-the-void #voidFloor {
+  display: block;
+  position: absolute;
+  width: 5000px;
+  height: 5000px;
+  left: -2500px;
+  top: -2500px;
+  transform: rotateX(90deg) translateZ(-520px);
+  background-image: 
+    linear-gradient(to right, rgba(148, 163, 184, 0.35) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.35) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(circle at center, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(circle at center, black 30%, transparent 75%);
+  pointer-events: none;
+}
+
+/* Soft contact shadow beneath the card */
+#floorShadow {
+  display: none;
+}
+
+body.in-the-void #floorShadow {
+  display: block;
+  position: absolute;
+  width: 860px;
+  height: 400px;
+  left: -430px;
+  top: -200px;
+  transform: rotateX(90deg) translateZ(-510px);
+  background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.28) 0%, rgba(15, 23, 42, 0.07) 50%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Page Backside (Rear of Card) */
+#pageBackside {
+  display: none;
+}
+
+body.in-the-void #pageBackside {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  position: absolute;
+  inset: 0;
+  border-radius: 1.25rem;
+  background: radial-gradient(circle at 50% 25%, #1e293b 0%, #0f172a 100%);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  transform: rotateY(180deg) translateZ(2px);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  color: white;
+  padding: 4.5rem 2rem 2.5rem;
+  text-align: center;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+/* Circuit pattern on back */
+#pageBackside::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: 
+    radial-gradient(rgba(59, 130, 246, 0.18) 1px, transparent 1px),
+    radial-gradient(rgba(99, 102, 241, 0.12) 1px, transparent 1px);
+  background-size: 24px 24px, 48px 48px;
+  background-position: 0 0, 12px 12px;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+/* The 3D Floating Easter Egg behind the plane */
+#easterEgg3D {
+  position: relative;
+  margin-top: 1.25rem;
+  transform: translateZ(45px);
+  transform-style: preserve-3d;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#easterEgg3D.claimed {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateZ(45px) scale(0) rotate(20deg);
+}
+
+.egg-mesh {
+  width: 110px;
+  height: 145px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 35% 30%, #fde047, #eab308 45%, #ca8a04 75%, #854d0e 100%);
+  box-shadow: 
+    0 15px 35px -5px rgba(234, 179, 8, 0.45),
+    inset -8px -8px 20px rgba(113, 63, 18, 0.6),
+    inset 8px 8px 16px rgba(254, 240, 138, 0.85);
+  border: 1.5px solid rgba(254, 240, 138, 0.6);
+  position: relative;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
+  animation: floatEgg 3.5s ease-in-out infinite alternate;
+}
+
+#easterEgg3D:hover .egg-mesh {
+  transform: scale(1.1) rotate(5deg);
+  filter: drop-shadow(0 0 20px rgba(234, 179, 8, 0.75));
+}
+
+@keyframes floatEgg {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(-3deg); }
+  100% { transform: translateY(0px) rotate(3deg); }
+}
+
+/* Glossy specular highlight on golden egg */
+.egg-mesh::before {
+  content: '';
+  position: absolute;
+  top: 18%;
+  left: 22%;
+  width: 28px;
+  height: 42px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0) 70%);
+  transform: rotate(-25deg);
+  pointer-events: none;
+}
+
+/* Return HUD Button in Lower Third */
+#voidHud {
+  display: none;
+}
+
+body.in-the-void #voidHud {
+  display: flex;
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.45);
+  border-radius: 9999px;
+  padding: 0.625rem 1.25rem;
+  color: #ffffff;
+  user-select: none;
+}
+
+#voidHud button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #f8fafc;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+#voidHud button:hover {
+  color: #60a5fa;
+}
+
+.kbd-pill {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.125rem 0.45rem;
+  border-radius: 0.25rem;
+  color: #cbd5e1;
+}
+
+/* Void Controls Guide Pill in Upper Center */
+#voidControlsGuide {
+  display: none;
+}
+
+body.in-the-void #voidControlsGuide {
+  display: flex;
+  position: fixed;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  padding: 0.4rem 1rem;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  pointer-events: none;
+}

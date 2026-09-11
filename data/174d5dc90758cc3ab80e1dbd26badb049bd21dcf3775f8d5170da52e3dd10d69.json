@@ -1,0 +1,25 @@
+{
+  "student_hash": "174d5dc90758cc3ab80e1dbd26badb049bd21dcf3775f8d5170da52e3dd10d69",
+  "last_updated": "2026-09-22T23:50:24.632561+00:00",
+  "courses": {
+    "GETXR": {
+      "enrolled": true,
+      "base": 2.0,
+      "earned": 0.0,
+      "spent": 0.0,
+      "balance": 2.0,
+      "transactions": [
+        {
+          "date": "2026-09-01",
+          "type": "BASE",
+          "delta": 2.0,
+          "reason": "Initial Starting Allocation"
+        }
+      ]
+    },
+    "3DMA": {
+      "enrolled": false,
+      "reason": "Not enrolled in this course."
+    }
+  }
+}
