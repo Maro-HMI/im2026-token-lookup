@@ -1526,11 +1526,24 @@ body.kawaii-mode ::selection {
 body.kawaii-mode #pageFront,
 body.kawaii-mode #cardGetxr,
 body.kawaii-mode #card3dma,
-body.kawaii-mode .search-input-wrap,
 body.kawaii-mode .altimeter-card {
   border-radius: 1.5rem !important;
   border-color: #fbcfe8 !important;
   box-shadow: 0 16px 36px -6px rgba(244, 114, 182, 0.22), 0 0 0 1px rgba(244, 114, 182, 0.2) !important;
+}
+
+/* Pillowy Capsule Search Bar in Kawaii Mode */
+body.kawaii-mode .search-input-wrap {
+  border-radius: 9999px !important;
+  border-color: #fbcfe8 !important;
+  box-shadow: 0 16px 36px -6px rgba(244, 114, 182, 0.22), 0 0 0 1px rgba(244, 114, 182, 0.2) !important;
+  padding: 0.25rem 0.35rem 0.25rem 0.6rem !important;
+  overflow: hidden !important;
+}
+
+body.kawaii-mode .search-input-wrap:focus-within {
+  border-color: #f472b6 !important;
+  box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.25), 0 16px 36px -6px rgba(244, 114, 182, 0.22) !important;
 }
 
 /* Navigation bar */
@@ -1627,12 +1640,19 @@ body.kawaii-mode #modeToggleBtn {
 
 /* Search Submit Button */
 body.kawaii-mode #submitBtn {
+  border-radius: 9999px !important;
   background: linear-gradient(135deg, #ec4899 0%, #db2777 100%) !important;
-  box-shadow: 0 4px 14px rgba(236, 72, 153, 0.4) !important;
+  box-shadow: 0 3px 12px rgba(236, 72, 153, 0.35) !important;
+  padding: 0.45rem 1rem !important;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
 }
 body.kawaii-mode #submitBtn:hover {
   background: linear-gradient(135deg, #f472b6 0%, #ec4899 100%) !important;
-  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.55) !important;
+  box-shadow: 0 5px 18px rgba(236, 72, 153, 0.5) !important;
+  transform: scale(1.02);
+}
+body.kawaii-mode #submitBtn:active {
+  transform: scale(0.97);
 }
 
 /* Kawaii 3D Void Crossover: The Candy Cloud Dimension */

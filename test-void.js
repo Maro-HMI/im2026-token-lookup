@@ -1090,7 +1090,7 @@ function setMode(modeOrJuicy, updateUrl = true) {
     if (studentInput) studentInput.placeholder = 'e.g. s1234567 (ฅ^•ﻌ•^ฅ)';
     if (submitBtn) {
       const span = submitBtn.querySelector('span');
-      if (span) span.textContent = 'Lookup (•̀ᴗ•́)و';
+      if (span) span.textContent = 'Check ✨';
     }
 
     // Telemetry & Fanfare
