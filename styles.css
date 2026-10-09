@@ -1557,6 +1557,7 @@ body.kawaii-mode header {
 body.kawaii-mode #cardGetxr,
 body.kawaii-mode #card3dma {
   position: relative !important;
+  overflow: visible !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -1564,16 +1565,18 @@ body.kawaii-mode #cardGetxr::before,
 body.kawaii-mode #card3dma::before {
   content: '';
   position: absolute;
-  top: -14px;
-  left: 28px;
-  width: 0;
-  height: 0;
-  border-left: 13px solid transparent;
-  border-right: 13px solid transparent;
-  border-bottom: 17px solid #f472b6;
+  top: -24px;
+  left: 26px;
+  width: 28px;
+  height: 25px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 26' fill='none'%3E%3Cpath d='M2 26 C3 14 8 2 14 2 C20 2 25 14 26 26 Z' fill='%23f472b6'/%3E%3Cpath d='M7 25 C8 16 11 8 14 8 C17 8 20 16 21 25 Z' fill='%23fdf2f8'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  transform: rotate(-10deg);
   transform-origin: bottom center;
   transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
-  filter: drop-shadow(0 2px 4px rgba(244, 114, 182, 0.35));
+  filter: drop-shadow(0 2px 4px rgba(244, 114, 182, 0.4));
   z-index: 10;
   pointer-events: none;
 }
@@ -1582,28 +1585,30 @@ body.kawaii-mode #cardGetxr::after,
 body.kawaii-mode #card3dma::after {
   content: '';
   position: absolute;
-  top: -14px;
-  right: 28px;
-  width: 0;
-  height: 0;
-  border-left: 13px solid transparent;
-  border-right: 13px solid transparent;
-  border-bottom: 17px solid #f472b6;
+  top: -24px;
+  right: 26px;
+  width: 28px;
+  height: 25px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 26' fill='none'%3E%3Cpath d='M2 26 C3 14 8 2 14 2 C20 2 25 14 26 26 Z' fill='%23f472b6'/%3E%3Cpath d='M7 25 C8 16 11 8 14 8 C17 8 20 16 21 25 Z' fill='%23fdf2f8'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  transform: rotate(10deg);
   transform-origin: bottom center;
   transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
-  filter: drop-shadow(0 2px 4px rgba(244, 114, 182, 0.35));
+  filter: drop-shadow(0 2px 4px rgba(244, 114, 182, 0.4));
   z-index: 10;
   pointer-events: none;
 }
 
 body.kawaii-mode #cardGetxr:hover::before,
 body.kawaii-mode #card3dma:hover::before {
-  transform: rotate(-14deg) scale(1.18);
+  transform: rotate(-22deg) scale(1.15);
 }
 
 body.kawaii-mode #cardGetxr:hover::after,
 body.kawaii-mode #card3dma:hover::after {
-  transform: rotate(14deg) scale(1.18);
+  transform: rotate(22deg) scale(1.15);
 }
 
 /* Blushing icons and animated cheek glow */
