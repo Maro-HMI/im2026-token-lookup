@@ -2260,8 +2260,6 @@ function handleClearSearch() {
 
 // ==========================================================================
 // Protocol Telemetry & Diagnostics (7 Subsystems)
-// Nice try inspecting the source! You didn't think it would be THAT easy, right? 😉
-// Searching for secrets in DevTools? Try interacting with the page instead of Ctrl+F!
 // ==========================================================================
 
 const _K_STORE = atob('aW1fdG9rZW5zX2Rpc2NvdmVyZWRfZWdncw==');
