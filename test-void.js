@@ -1302,7 +1302,7 @@ function updateKawaiiStaticTexts(active) {
   // 2. Hero title & subtitle
   const heroTitle = document.querySelector('#mainContainer h2');
   if (heroTitle) {
-    _saveAndSetText('heroTitle', heroTitle, 'Check Late Token Balance ~desu! (◕‿◕✿)', active);
+    _saveAndSetText('heroTitle', heroTitle, 'Check Late Token Balance ~desu! (✿◠‿◠)', active);
   }
   const heroSub = document.querySelector('#mainContainer p.text-slate-500');
   if (heroSub) {
@@ -1492,7 +1492,7 @@ function setMode(modeOrJuicy, updateUrl = true) {
       spawnBurstAtElement(toggleBtn, ['#fbcfe8', '#f472b6', '#fda4af', '#fce7f3', '#ffffff'], 'sakura', 24);
     }
 
-    if (ticket) ticket.setAttribute('title', 'Inspect golden ticket nya~ (◕‿◕✿)');
+    if (ticket) ticket.setAttribute('title', 'Inspect golden ticket nya~ (✿◠‿◠)');
     if (getxrLogo) getxrLogo.setAttribute('title', 'Inspect GETXR ~desu (* ^ ω ^)');
     if (threedmaLogo) threedmaLogo.setAttribute('title', 'Inspect 3DMA ~desu (o˘◡˘o)');
     if (getxrBal) getxrBal.setAttribute('title', 'Click to flip token nya! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧');
@@ -1978,7 +1978,7 @@ function renderCourseCard(courseKey, data) {
       if (balance >= 3.0) {
         badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-pink-100 text-pink-800 border border-pink-300 shrink-0';
         badge.innerHTML = `<svg class="w-3 h-3 text-pink-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>Stockpiler-nya! 👑</span>`;
-        badge.title = 'Vault reserve ≥ 3.0 tokens nya! Super prepared ~desu! (◕‿◕✿)';
+        badge.title = 'Vault reserve ≥ 3.0 tokens nya! Super prepared ~desu! (✿◠‿◠)';
         if (cardEl) cardEl.classList.add(isGetxr ? 'aura-glow-gold' : 'aura-glow-indigo');
       } else if (earned > 0.0) {
         badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0';
