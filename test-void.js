@@ -8,6 +8,7 @@ let appConfig = null;
 let isJuicyMode = true;
 let isSoundEnabled = false; // Always defaults to OFF on load/reload; never persisted
 let currentStudentId = '';
+let isKawaiiMode = false;
 
 // ==========================================================================
 // Procedural Web Audio Synthesizer (Juicy Mode SFX — Zero External Assets)
@@ -131,8 +132,13 @@ const SoundEngine = (() => {
   }
 
   return {
-    // 1. Sound Toggle ON (Crisp Switch Joy-Con two-note click: C5 -> G5)
+    // 1. Sound Toggle ON (Crisp Switch Joy-Con two-note click: C5 -> G5, or pastel chime in Kawaii mode)
     playToggleOn() {
+      if (isKawaiiMode) {
+        playTone({ freqStart: 1046.5, freqEnd: 1318.5, type: 'triangle', duration: 0.08, gainPeak: 0.10, filterFreq: 4000 });
+        playTone({ freqStart: 1567.98, freqEnd: 2093.0, type: 'sine', duration: 0.14, gainPeak: 0.11, delay: 0.05, filterFreq: 5000 });
+        return;
+      }
       playNoiseBurst(0.016, 1800, 'bandpass', 1.8, 0.11, 0);
       playTone({ freqStart: 523.25, freqEnd: 545, type: 'triangle', duration: 0.075, gainPeak: 0.11, delay: 0, filterFreq: 2400 });
       playTone({ freqStart: 783.99, freqEnd: 810, type: 'sine', duration: 0.13, gainPeak: 0.12, delay: 0.055, filterFreq: 3000 });
@@ -140,13 +146,21 @@ const SoundEngine = (() => {
 
     // 2. Sound Toggle OFF / Switch to Vanilla (Soft muted power-down thud: E4 -> A3)
     playToggleOff() {
+      if (isKawaiiMode) {
+        playTone({ freqStart: 659.25, freqEnd: 440.0, type: 'sine', duration: 0.09, gainPeak: 0.08, filterFreq: 1800 });
+        return;
+      }
       playTone({ freqStart: 329.63, freqEnd: 196.0, type: 'sine', duration: 0.095, gainPeak: 0.09, delay: 0, filterFreq: 1100 });
       playNoiseBurst(0.02, 700, 'lowpass', 1.0, 0.06, 0);
     },
 
-    // 3. Lookup / Search Button Click
+    // 3. Lookup / Search Button Click (or magic wand sparkle cascade in Kawaii mode)
     playLookupClick() {
       if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiLookup();
+        return;
+      }
       const jitter = 0.97 + Math.random() * 0.06;
       playNoiseBurst(0.014, 1400 * jitter, 'bandpass', 1.8, 0.09, 0);
       playTone({ freqStart: 240 * jitter, freqEnd: 140 * jitter, type: 'triangle', duration: 0.045, gainPeak: 0.095, filterFreq: 1300 });
@@ -155,12 +169,20 @@ const SoundEngine = (() => {
     // 4. Score Roll-Up Marimba Tick & Completion Bell Pop
     playCounterTick(progress) {
       if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiCounterTick(progress);
+        return;
+      }
       const freq = 310 + progress * 340 + (Math.random() - 0.5) * 14;
       playTone({ freqStart: freq, freqEnd: freq * 0.92, type: 'triangle', duration: 0.035, gainPeak: 0.055, filterFreq: 1800 });
     },
 
     playCounterPop(targetVal) {
       if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiCounterPop(targetVal);
+        return;
+      }
       if (targetVal >= 3.0) {
         // Warm harmonic chord pop for Stockpiler (G5 + B5 + D6)
         playTone({ freqStart: 783.99, type: 'sine', duration: 0.20, gainPeak: 0.09, delay: 0, filterFreq: 3000 });
@@ -174,14 +196,22 @@ const SoundEngine = (() => {
     // 5. Ledger Row Card-Dealing Tick
     playLedgerDeal(index) {
       if (!canPlay() || index > 7) return;
+      if (isKawaiiMode) {
+        this.playKawaiiLedgerDeal(index);
+        return;
+      }
       const delay = index * 0.045;
       const freq = (1250 + index * 65) * (0.96 + Math.random() * 0.08);
       playNoiseBurst(0.018, freq, 'bandpass', 2.0, 0.06, delay);
     },
 
-    // 6. Error / Not Found Alert (Low wooden marimba double-tap)
+    // 6. Error / Not Found Alert (Low wooden marimba double-tap, or cute anime sad pout)
     playErrorAlert() {
       if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiSadPout();
+        return;
+      }
       playTone({ freqStart: 174.61, freqEnd: 155.56, type: 'triangle', duration: 0.09, gainPeak: 0.11, delay: 0, filterFreq: 900 });
       playTone({ freqStart: 146.83, freqEnd: 130.81, type: 'triangle', duration: 0.13, gainPeak: 0.11, delay: 0.095, filterFreq: 850 });
     },
@@ -189,6 +219,10 @@ const SoundEngine = (() => {
     // 7. Secret #6 (0x6f) — Course Card Drag, Nudge, Swap & Settle
     playCardPickup() {
       if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiSquish();
+        return;
+      }
       playTone({ freqStart: 180, freqEnd: 320, type: 'triangle', duration: 0.075, gainPeak: 0.095, filterFreq: 1500 });
       playNoiseBurst(0.028, 950, 'bandpass', 1.4, 0.08, 0);
     },
@@ -201,6 +235,10 @@ const SoundEngine = (() => {
 
     playCardSwap() {
       if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiSwap();
+        return;
+      }
       // Crisp card-shuffle whoosh + warm table thud + bright shuffle chord
       playNoiseBurst(0.09, 1050, 'bandpass', 1.1, 0.16, 0);
       playTone({ freqStart: 165, freqEnd: 72, type: 'triangle', duration: 0.13, gainPeak: 0.15, delay: 0.01, filterFreq: 750 });
@@ -210,6 +248,10 @@ const SoundEngine = (() => {
 
     playCardSettle() {
       if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiSqueak();
+        return;
+      }
       playTone({ freqStart: 230, freqEnd: 135, type: 'sine', duration: 0.075, gainPeak: 0.085, filterFreq: 1000 });
       playNoiseBurst(0.025, 650, 'lowpass', 1.2, 0.055, 0);
     },
@@ -255,6 +297,10 @@ const SoundEngine = (() => {
     // 9. Secret #5 (0x5e) Logo Bobble & Secret #4 (0x4d) Golden Ticket Spin
     playLogoBobble(isGetxr) {
       if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiTwinkle();
+        return;
+      }
       const base = isGetxr ? 246.94 : 293.66;
       // Elastic rubber boing + shader-compiled harmonic chime
       playTone({ freqStart: base, freqEnd: base * 1.95, type: 'triangle', duration: 0.095, gainPeak: 0.13, delay: 0, filterFreq: 2200 });
@@ -264,6 +310,10 @@ const SoundEngine = (() => {
 
     playTicketSpin() {
       if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiTwinkle();
+        return;
+      }
       // Foil card spin whoosh + 4-note golden ticket sparkle arpeggio
       playNoiseBurst(0.045, 1900, 'bandpass', 1.4, 0.11, 0);
       const sparkle = [659.25, 880.0, 1174.66, 1760.0];
@@ -555,6 +605,10 @@ const SoundEngine = (() => {
 
     playFootstep(isRunning) {
       if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiPaws(isRunning);
+        return;
+      }
       const jitter = 0.94 + Math.random() * 0.12;
       const freq = (isRunning ? 145 : 115) * jitter;
       playTone({ freqStart: freq, freqEnd: freq * 0.55, type: 'triangle', duration: 0.045, gainPeak: isRunning ? 0.075 : 0.055, filterFreq: 650 });
@@ -714,6 +768,10 @@ const SoundEngine = (() => {
 
     playPhysicsBounce(impactSpeed = 10) {
       if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiMochiBounce(impactSpeed);
+        return;
+      }
       const now = performance.now();
       if (now - lastPhysicsBounceSoundTime < 60) return;
       lastPhysicsBounceSoundTime = now;
@@ -733,6 +791,10 @@ const SoundEngine = (() => {
 
     playCardKick(intensity = 1.0) {
       if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiCardKick(intensity);
+        return;
+      }
       const now = performance.now();
       if (now - lastPhysicsBounceSoundTime < 70) return;
       lastPhysicsBounceSoundTime = now;
@@ -871,6 +933,172 @@ const SoundEngine = (() => {
         mod.stop(t0 + 0.46);
         osc.stop(t0 + 0.46);
       });
+    },
+
+    playKawaiiMeow() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(680, t0);
+        osc.frequency.exponentialRampToValueAtTime(1080, t0 + 0.12);
+        osc.frequency.exponentialRampToValueAtTime(820, t0 + 0.32);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.Q.setValueAtTime(2.2, t0);
+        filter.frequency.setValueAtTime(1200, t0);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.linearRampToValueAtTime(0.18, t0 + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.36);
+      });
+    },
+
+    playKawaiiLookup() {
+      if (!canPlay()) return;
+      // Magic star wand chirp + bubble pop + pentatonic chime cascade
+      playTone({ freqStart: 880, freqEnd: 1760, type: 'sine', duration: 0.12, gainPeak: 0.12, filterFreq: 4000 });
+      const chime = [1046.5, 1318.5, 1567.98, 2093.0];
+      chime.forEach((f, idx) => {
+        playTone({ freqStart: f, type: 'triangle', duration: 0.22, gainPeak: 0.08, delay: 0.04 + idx * 0.045, filterFreq: 5000 });
+      });
+    },
+
+    playKawaiiKeypress() {
+      if (!canPlay()) return;
+      const jitter = 0.92 + Math.random() * 0.16;
+      const freq = 980 * jitter;
+      playTone({ freqStart: freq, freqEnd: freq * 1.35, type: 'sine', duration: 0.04, gainPeak: 0.065, filterFreq: 3200 });
+    },
+
+    playKawaiiSadPout() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(820, t0);
+        osc.frequency.exponentialRampToValueAtTime(540, t0 + 0.18);
+        osc.frequency.exponentialRampToValueAtTime(420, t0 + 0.42);
+
+        const lfo = ctx.createOscillator();
+        lfo.frequency.setValueAtTime(6.5, t0); // vibrato wobble
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.setValueAtTime(14, t0);
+        lfo.connect(lfoGain);
+        lfoGain.connect(osc.frequency);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1400, t0);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.linearRampToValueAtTime(0.14, t0 + 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.45);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        lfo.start(t0);
+        osc.start(t0);
+        lfo.stop(t0 + 0.46);
+        osc.stop(t0 + 0.46);
+      });
+    },
+
+    playKawaiiCounterTick(progress) {
+      if (!canPlay()) return;
+      const base = 1046.5; // C6
+      const freq = base + (progress * 523.25) + (Math.random() - 0.5) * 20;
+      playTone({ freqStart: freq, type: 'sine', duration: 0.045, gainPeak: 0.06, filterFreq: 4500 });
+    },
+
+    playKawaiiCounterPop(val) {
+      if (!canPlay()) return;
+      const notes = [1046.5, 1318.5, 1567.98, 2093.0, 2637.02];
+      notes.forEach((f, idx) => {
+        playTone({ freqStart: f, freqEnd: f * 1.02, type: 'sine', duration: 0.28, gainPeak: 0.085, delay: idx * 0.045, filterFreq: 5500 });
+      });
+    },
+
+    playKawaiiLedgerDeal(index) {
+      if (!canPlay() || index > 7) return;
+      const pentatonic = [1046.5, 1174.66, 1318.51, 1567.98, 1760.0];
+      const freq = pentatonic[index % pentatonic.length] * (0.98 + Math.random() * 0.04);
+      playTone({ freqStart: freq, freqEnd: freq * 1.15, type: 'sine', duration: 0.065, gainPeak: 0.07, delay: index * 0.04, filterFreq: 4200 });
+    },
+
+    playKawaiiSquish() {
+      if (!canPlay()) return;
+      playTone({ freqStart: 380, freqEnd: 640, type: 'triangle', duration: 0.08, gainPeak: 0.09, filterFreq: 1800 });
+    },
+
+    playKawaiiSwap() {
+      if (!canPlay()) return;
+      playTone({ freqStart: 520, freqEnd: 780, type: 'sine', duration: 0.12, gainPeak: 0.10, filterFreq: 2800 });
+      playTone({ freqStart: 780, freqEnd: 1046.5, type: 'triangle', duration: 0.16, gainPeak: 0.08, delay: 0.04, filterFreq: 3400 });
+    },
+
+    playKawaiiSqueak() {
+      if (!canPlay()) return;
+      playTone({ freqStart: 720, freqEnd: 480, type: 'sine', duration: 0.07, gainPeak: 0.08, filterFreq: 2200 });
+    },
+
+    playKawaiiTwinkle() {
+      if (!canPlay()) return;
+      const harp = [1318.51, 1567.98, 1975.53, 2637.02];
+      harp.forEach((f, idx) => {
+        playTone({ freqStart: f, type: 'sine', duration: 0.22, gainPeak: 0.075, delay: idx * 0.04, filterFreq: 5000 });
+      });
+    },
+
+    playKawaiiPaws(isRunning) {
+      if (!canPlay()) return;
+      const jitter = 0.95 + Math.random() * 0.10;
+      const freq = (isRunning ? 340 : 280) * jitter;
+      playTone({ freqStart: freq, freqEnd: freq * 0.75, type: 'sine', duration: 0.04, gainPeak: isRunning ? 0.065 : 0.045, filterFreq: 1100 });
+    },
+
+    playKawaiiMochiBounce(impactSpeed = 10) {
+      if (!canPlay()) return;
+      const now = performance.now();
+      if (now - lastPhysicsBounceSoundTime < 65) return;
+      lastPhysicsBounceSoundTime = now;
+      const norm = Math.min(1.0, impactSpeed / 20.0);
+      const base = 280 + norm * 160;
+      playTone({ freqStart: base, freqEnd: base * 1.8, type: 'sine', duration: 0.065, gainPeak: 0.06 + norm * 0.08, filterFreq: 2200 });
+    },
+
+    playKawaiiCardKick(intensity = 1.0) {
+      if (!canPlay()) return;
+      const now = performance.now();
+      if (now - lastPhysicsBounceSoundTime < 70) return;
+      lastPhysicsBounceSoundTime = now;
+      const norm = Math.max(0.4, Math.min(2.0, intensity));
+      playTone({ freqStart: 260 * norm, freqEnd: 540 * norm, type: 'sine', duration: 0.09, gainPeak: 0.14 * norm, filterFreq: 2600 });
+      playTone({ freqStart: 540 * norm, freqEnd: 320 * norm, type: 'triangle', duration: 0.11, gainPeak: 0.10 * norm, delay: 0.04, filterFreq: 2200 });
+    },
+
+    suspendCtx() {
+      if (audioCtx && audioCtx.state === 'running') {
+        audioCtx.suspend().catch(() => {});
+      }
+    },
+
+    resumeCtx() {
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
     }
   };
 })();
@@ -923,6 +1151,7 @@ function setSoundEnabled(enabled, playFeedback = true) {
   if (!isJuicyMode) {
     isSoundEnabled = false;
     SoundEngine.stopVoidCharge(false);
+    SoundEngine.suspendCtx();
     updateSoundUI();
     return;
   }
@@ -930,6 +1159,12 @@ function setSoundEnabled(enabled, playFeedback = true) {
   const wasEnabled = isSoundEnabled;
   isSoundEnabled = Boolean(enabled);
   updateSoundUI();
+
+  if (isSoundEnabled) {
+    SoundEngine.resumeCtx();
+  } else {
+    SoundEngine.suspendCtx();
+  }
 
   if (playFeedback) {
     if (isSoundEnabled && !wasEnabled) {
@@ -993,7 +1228,6 @@ async function loadConfig() {
 // Mode Management (Juicy vs Vanilla)
 // ==========================================================================
 
-let isKawaiiMode = false;
 let _origHeroSubtitle = null;
 let _origPlaceholder = null;
 let _origSubmitText = null;
@@ -1336,13 +1570,23 @@ function setMode(modeOrJuicy, updateUrl = true) {
 // Canvas Particle System
 // ==========================================================================
 
+let resizeRafId = null;
+
 function initCanvas() {
   canvas = document.getElementById('fxCanvas');
   if (canvas) {
     ctx = canvas.getContext('2d');
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('resize', handleWindowResize, { passive: true });
   }
+}
+
+function handleWindowResize() {
+  if (resizeRafId) return;
+  resizeRafId = requestAnimationFrame(() => {
+    resizeRafId = null;
+    resizeCanvas();
+  });
 }
 
 function resizeCanvas() {
@@ -1389,13 +1633,20 @@ function spawnBurstAtElement(element, colorPalette, shape = 'circle', count = 22
     particles.push(createParticle(centerX, centerY, colorPalette, shape));
   }
 
-  if (!animFrameId) {
+  if (!animFrameId && !document.hidden) {
     animateParticles();
   }
 }
 
 function animateParticles() {
-  if (!ctx || particles.length === 0) {
+  if (document.hidden) {
+    animFrameId = null;
+    return;
+  }
+
+  const shouldRunKawaiiAmbient = isKawaiiMode && canvas && !isInTheVoid;
+
+  if (!ctx || (particles.length === 0 && !shouldRunKawaiiAmbient)) {
     if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
     animFrameId = null;
     return;
@@ -1485,28 +1736,32 @@ function animateParticles() {
     }
   }
 
-  // Ambient gentle sakura & heart drift in Kawaii Mode
-  if (isKawaiiMode && canvas) {
-    if (particles.length < 28 && Math.random() < 0.14) {
+  // Ambient gentle sakura & heart drift in Kawaii Mode (capped at 14 particles, paused in The Void or when backgrounded)
+  if (shouldRunKawaiiAmbient) {
+    if (particles.length < 14 && Math.random() < 0.08) {
       particles.push({
         x: Math.random() * canvas.width,
         y: -15,
-        vx: (Math.random() - 0.4) * 1.2,
-        vy: 0.8 + Math.random() * 1.2,
-        size: 5 + Math.random() * 6,
+        vx: (Math.random() - 0.4) * 1.1,
+        vy: 0.7 + Math.random() * 1.0,
+        size: 5 + Math.random() * 5,
         color: ['#fbcfe8', '#f472b6', '#fda4af', '#fce7f3', '#ffffff'][Math.floor(Math.random() * 5)],
         alpha: 0.85,
-        decay: 0.003,
+        decay: 0.0035,
         rotation: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random() - 0.5) * 0.035,
-        shape: Math.random() > 0.3 ? 'sakura' : 'heart',
-        gravity: 0.015,
+        rotSpeed: (Math.random() - 0.5) * 0.03,
+        shape: Math.random() > 0.35 ? 'sakura' : 'heart',
+        gravity: 0.012,
         drag: 0.99
       });
     }
   }
 
-  animFrameId = requestAnimationFrame(animateParticles);
+  if (particles.length > 0 || shouldRunKawaiiAmbient) {
+    animFrameId = requestAnimationFrame(animateParticles);
+  } else {
+    animFrameId = null;
+  }
 }
 
 function spawnKawaiiHeartPuff() {
@@ -2917,9 +3172,14 @@ function setupCardTilt() {
 
     card.addEventListener('mouseenter', () => {
       if (!isJuicyMode || window.innerWidth < 768) return;
+      card.style.willChange = 'transform';
       updateRect();
       if (isKawaiiMode) {
-        SoundEngine.playKawaiiPurr();
+        if (Math.random() < 0.6) {
+          SoundEngine.playKawaiiMeow();
+        } else {
+          SoundEngine.playKawaiiPurr();
+        }
       }
     });
 
@@ -2942,10 +3202,11 @@ function setupCardTilt() {
           glint.style.setProperty('--glint-y', `${((targetY + 0.5) * 100).toFixed(1)}%`);
         });
       }
-    });
+    }, { passive: true });
 
     card.addEventListener('mouseleave', () => {
       rect = null;
+      card.style.willChange = '';
       if (tiltRafId) {
         cancelAnimationFrame(tiltRafId);
         tiltRafId = null;
@@ -3337,7 +3598,21 @@ function init3DVoidModule() {
   // Window blur / tab switch safeguard
   window.addEventListener('blur', cancelHold);
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) cancelHold();
+    if (document.hidden) {
+      cancelHold();
+      if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+      SoundEngine.suspendCtx();
+    } else {
+      if (!animFrameId && isJuicyMode && (particles.length > 0 || (isKawaiiMode && !isInTheVoid))) {
+        animFrameId = requestAnimationFrame(animateParticles);
+      }
+      if (isSoundEnabled) {
+        SoundEngine.resumeCtx();
+      }
+    }
   });
 
   // 2. Enter The Void
@@ -3817,44 +4092,64 @@ function init3DVoidModule() {
     return 'rgb(5, 5, 10)';
   }
 
+  let _lastBgColor = '';
+  let _lastFloorOpacity = '';
+  let _lastShadowOpacity = '';
+  let _lastStarOpacity = '';
+  let _lastCloudOpacity = '';
+  let _lastCloudDisplay = '';
+  let _lastAltimeterVisible = null;
+  let _lastAltimeterZone = '';
+  let _lastAltimeterRoundY = -1;
+  let _lastClimbArrowDesc = null;
+  let _lastGaugePct = '';
+
   function updateAtmosphericVisuals(y, vy) {
-    // 1. Interpolate atmospheric background color
+    // 1. Interpolate atmospheric background color (only mutate CSS var when value changes)
     const bgColor = getAtmosphericBgColor(y);
-    document.body.style.setProperty('--void-bg', bgColor);
+    if (bgColor !== _lastBgColor) {
+      _lastBgColor = bgColor;
+      document.body.style.setProperty('--void-bg', bgColor);
+    }
 
     // 2. Fade floor grid and shadow with altitude
     if (voidFloor) {
-      const floorOpacity = Math.max(0, 1.0 - (y / 2400));
-      voidFloor.style.opacity = floorOpacity.toFixed(3);
+      const floorOpacity = Math.max(0, 1.0 - (y / 2400)).toFixed(3);
+      if (floorOpacity !== _lastFloorOpacity) {
+        _lastFloorOpacity = floorOpacity;
+        voidFloor.style.opacity = floorOpacity;
+      }
     }
     if (floorShadow) {
-      const shadowOpacity = Math.max(0, 1.0 - (y / 700));
-      floorShadow.style.opacity = shadowOpacity.toFixed(3);
+      const shadowOpacity = Math.max(0, 1.0 - (y / 700)).toFixed(3);
+      if (shadowOpacity !== _lastShadowOpacity) {
+        _lastShadowOpacity = shadowOpacity;
+        floorShadow.style.opacity = shadowOpacity;
+      }
     }
 
     // 3. Fade in starfield in Stratosphere and Space
     if (voidStarfield) {
-      const starOpacity = Math.max(0, Math.min(1.0, (y - 1800) / 2400));
-      voidStarfield.style.opacity = starOpacity.toFixed(3);
+      const starOpacity = Math.max(0, Math.min(1.0, (y - 1800) / 2400)).toFixed(3);
+      if (starOpacity !== _lastStarOpacity) {
+        _lastStarOpacity = starOpacity;
+        voidStarfield.style.opacity = starOpacity;
+      }
     }
 
-    // 4. Troposphere 3D Clouds (smooth S-curve fade-in from ground, full in troposphere, smooth cosine fade-out into stratosphere)
+    // 4. Troposphere 3D Clouds
     if (voidCloudContainer) {
       let cloudOpacity = 0;
 
       if (y <= 550) {
-        // Ground studio: strictly 0 opacity and hidden so flat page is pristine
         cloudOpacity = 0;
       } else if (y < 1100) {
-        // Ascending into troposphere: smooth S-curve fade-in
         const tIn = (y - 550) / 550;
         const smoothIn = 0.5 * (1 - Math.cos(tIn * Math.PI));
         cloudOpacity = 0.85 * smoothIn;
       } else if (y <= 3000) {
-        // Cruising through the troposphere cloud bank
         cloudOpacity = 0.85;
       } else if (y < 4800) {
-        // Ascending through stratosphere towards orbit: smooth S-curve fade-out
         const tOut = (y - 3000) / 1800;
         const smoothOut = 0.5 * (1 + Math.cos(tOut * Math.PI));
         cloudOpacity = 0.85 * smoothOut;
@@ -3863,35 +4158,64 @@ function init3DVoidModule() {
       }
 
       if (cloudOpacity <= 0.002) {
-        voidCloudContainer.style.opacity = '0';
-        voidCloudContainer.style.display = 'none';
+        if (_lastCloudDisplay !== 'none') {
+          _lastCloudDisplay = 'none';
+          _lastCloudOpacity = '0';
+          voidCloudContainer.style.opacity = '0';
+          voidCloudContainer.style.display = 'none';
+        }
       } else {
-        voidCloudContainer.style.display = 'block';
-        voidCloudContainer.style.opacity = cloudOpacity.toFixed(3);
+        const strOp = cloudOpacity.toFixed(3);
+        if (_lastCloudDisplay !== 'block') {
+          _lastCloudDisplay = 'block';
+          voidCloudContainer.style.display = 'block';
+        }
+        if (strOp !== _lastCloudOpacity) {
+          _lastCloudOpacity = strOp;
+          voidCloudContainer.style.opacity = strOp;
+        }
       }
     }
 
-    // 4. Update Altimeter Telemetry HUD
+    // 5. Update Altimeter Telemetry HUD
     if (voidAltimeter) {
-      if (y > 140) {
-        voidAltimeter.classList.add('visible');
-      } else {
-        voidAltimeter.classList.remove('visible');
+      const isVisible = y > 140;
+      if (isVisible !== _lastAltimeterVisible) {
+        _lastAltimeterVisible = isVisible;
+        if (isVisible) {
+          voidAltimeter.classList.add('visible');
+        } else {
+          voidAltimeter.classList.remove('visible');
+        }
       }
 
       const { name } = getAltitudeTier(y);
-      if (altimeterZone) altimeterZone.textContent = name;
-      if (altimeterValue) altimeterValue.textContent = Math.round(y).toLocaleString();
+      if (altimeterZone && name !== _lastAltimeterZone) {
+        _lastAltimeterZone = name;
+        altimeterZone.textContent = name;
+      }
+      const roundY = Math.round(y);
+      if (altimeterValue && roundY !== _lastAltimeterRoundY) {
+        _lastAltimeterRoundY = roundY;
+        altimeterValue.textContent = roundY.toLocaleString();
+      }
       if (altimeterClimbArrow) {
-        if (vy < -1.0) {
-          altimeterClimbArrow.classList.add('descending');
-        } else {
-          altimeterClimbArrow.classList.remove('descending');
+        const isDesc = vy < -1.0;
+        if (isDesc !== _lastClimbArrowDesc) {
+          _lastClimbArrowDesc = isDesc;
+          if (isDesc) {
+            altimeterClimbArrow.classList.add('descending');
+          } else {
+            altimeterClimbArrow.classList.remove('descending');
+          }
         }
       }
       if (altimeterGaugeFill) {
-        const pct = Math.min(100, Math.max(0, (y / 6000) * 100));
-        altimeterGaugeFill.style.width = `${pct.toFixed(1)}%`;
+        const pct = Math.min(100, Math.max(0, (y / 6000) * 100)).toFixed(1);
+        if (pct !== _lastGaugePct) {
+          _lastGaugePct = pct;
+          altimeterGaugeFill.style.width = `${pct}%`;
+        }
       }
     }
   }
@@ -4520,6 +4844,10 @@ function onGravityPointerDown(e) {
   targetBody.pointerVy = 0;
   targetBody.el.style.cursor = 'grabbing';
   targetBody.el.style.zIndex = '150';
+
+  if (!gravityAnimationId && isGravityModeActive) {
+    gravityAnimationId = requestAnimationFrame(_runGravityPhysicsLoop);
+  }
 }
 
 function onGravityPointerMove(e) {
@@ -4661,7 +4989,13 @@ function _runGravityPhysicsLoop() {
     b.el.style.transform = `translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0) rotate(${b.angle.toFixed(2)}deg)`;
   }
 
-  gravityAnimationId = requestAnimationFrame(_runGravityPhysicsLoop);
+  const hasMotion = gravityBodies.some(b => b.isDragging || Math.abs(b.vx) > 0.08 || Math.abs(b.vy) > 0.08 || Math.abs(b.vAngle) > 0.08);
+
+  if (hasMotion || draggedBody) {
+    gravityAnimationId = requestAnimationFrame(_runGravityPhysicsLoop);
+  } else {
+    gravityAnimationId = null;
+  }
 }
 
 function triggerGravityMode() {
@@ -4885,6 +5219,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const studentInputEl = document.getElementById('studentIdInput');
   if (studentInputEl) {
     studentInputEl.addEventListener('input', (e) => {
+      if (isKawaiiMode && isSoundEnabled) {
+        SoundEngine.playKawaiiKeypress();
+      }
       const val = e.target.value.trim().toLowerCase();
       if (val === 'clear' || val === 'reset') {
         e.target.value = '';
@@ -4902,6 +5239,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         e.target.value = '';
         e.target.blur();
         triggerGravityMode();
+        return;
+      }
+      if (isJuicyMode && (val === 'kawaii' || val === 'uwu' || val === 'nya')) {
+        e.target.value = '';
+        e.target.blur();
+        setMode('kawaii', true);
         return;
       }
     });

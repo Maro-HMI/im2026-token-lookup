@@ -1614,13 +1614,14 @@ body.kawaii-mode #card3dma:hover::after {
 /* Blushing icons and animated cheek glow */
 body.kawaii-mode #getxrLogo,
 body.kawaii-mode #threedmaLogo {
-  filter: drop-shadow(0 0 10px rgba(244, 114, 182, 0.6));
+  filter: drop-shadow(0 0 8px rgba(244, 114, 182, 0.65));
   animation: kawaiiCheekGlow 2.5s ease-in-out infinite alternate;
+  will-change: transform;
 }
 
 @keyframes kawaiiCheekGlow {
-  0% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(244, 114, 182, 0.4)); }
-  100% { transform: scale(1.06); filter: drop-shadow(0 0 14px rgba(244, 114, 182, 0.85)); }
+  0% { transform: scale(1); }
+  100% { transform: scale(1.06); }
 }
 
 /* Pastel Tokens Display Box */
