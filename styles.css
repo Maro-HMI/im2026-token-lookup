@@ -989,6 +989,8 @@ body.in-the-void #voidCloudContainer {
   transform-style: preserve-3d;
   animation: cloudDrift var(--drift-dur, 16s) ease-in-out infinite alternate;
   animation-delay: var(--drift-delay, 0s);
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .cloud-size-sm { transform: scale3d(0.75, 0.75, 1); }
@@ -1001,13 +1003,13 @@ body.in-the-void #voidCloudContainer {
   pointer-events: none;
   background: radial-gradient(circle at 48% 34%, 
     rgba(255, 255, 255, 0.96) 0%, 
-    rgba(255, 255, 255, 0.85) 42%, 
-    rgba(241, 245, 249, 0.6) 72%, 
-    rgba(226, 232, 240, 0.22) 88%, 
+    rgba(255, 255, 255, 0.85) 40%, 
+    rgba(241, 245, 249, 0.6) 68%, 
+    rgba(226, 232, 240, 0.2) 85%, 
     transparent 100%
   );
-  filter: blur(8px);
-  -webkit-filter: blur(8px);
+  filter: none;
+  -webkit-filter: none;
 }
 
 /* Wide, soft cumulus foundation base */
@@ -1017,14 +1019,15 @@ body.in-the-void #voidCloudContainer {
   left: -260px;
   top: -65px;
   border-radius: 50% 50% 42% 42%;
-  filter: blur(10px);
-  -webkit-filter: blur(10px);
   background: radial-gradient(ellipse at 50% 42%, 
     rgba(255, 255, 255, 0.92) 0%, 
-    rgba(248, 250, 252, 0.78) 46%, 
-    rgba(226, 232, 240, 0.42) 76%, 
+    rgba(248, 250, 252, 0.78) 44%, 
+    rgba(226, 232, 240, 0.4) 72%, 
+    rgba(226, 232, 240, 0.15) 86%, 
     transparent 100%
   );
+  filter: none;
+  -webkit-filter: none;
 }
 
 /* Grand center dome */
@@ -1033,8 +1036,8 @@ body.in-the-void #voidCloudContainer {
   height: 220px;
   left: -125px;
   top: -155px;
-  filter: blur(7px);
-  -webkit-filter: blur(7px);
+  filter: none;
+  -webkit-filter: none;
 }
 
 /* Left billowing lobe */
@@ -1043,8 +1046,8 @@ body.in-the-void #voidCloudContainer {
   height: 175px;
   left: -215px;
   top: -115px;
-  filter: blur(7px);
-  -webkit-filter: blur(7px);
+  filter: none;
+  -webkit-filter: none;
 }
 
 /* Right billowing lobe */
@@ -1053,8 +1056,8 @@ body.in-the-void #voidCloudContainer {
   height: 185px;
   left: 25px;
   top: -125px;
-  filter: blur(7px);
-  -webkit-filter: blur(7px);
+  filter: none;
+  -webkit-filter: none;
 }
 
 /* Extra top accent crest for natural asymmetry */
@@ -1063,8 +1066,8 @@ body.in-the-void #voidCloudContainer {
   height: 150px;
   left: -40px;
   top: -180px;
-  filter: blur(6px);
-  -webkit-filter: blur(6px);
+  filter: none;
+  -webkit-filter: none;
 }
 
 @keyframes cloudDrift {
@@ -1609,8 +1612,26 @@ body.kawaii-mode.in-the-void #floorShadow {
 }
 
 body.kawaii-mode.in-the-void .cloud-puff {
-  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #fce7f3 45%, #ede9fe 100%) !important;
-  box-shadow: 0 0 25px rgba(244, 114, 182, 0.35) !important;
+  background: radial-gradient(circle at 38% 32%, 
+    #ffffff 0%, 
+    #fce7f3 40%, 
+    rgba(245, 208, 254, 0.8) 65%, 
+    rgba(244, 114, 182, 0.32) 84%, 
+    transparent 100%
+  ) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  -webkit-filter: none !important;
+}
+
+body.kawaii-mode.in-the-void .puff-base {
+  background: radial-gradient(ellipse at 50% 42%, 
+    #ffffff 0%, 
+    #fce7f3 44%, 
+    rgba(245, 208, 254, 0.75) 68%, 
+    rgba(244, 114, 182, 0.28) 85%, 
+    transparent 100%
+  ) !important;
 }
 
 body.kawaii-mode.in-the-void #easterEgg3D .egg-mesh {

@@ -1742,6 +1742,47 @@ function resizeCanvas() {
   }
 }
 
+// Cached Off-Screen Sprites for High-Performance Particle Blitting
+const _particleSpriteCache = {};
+
+function getCachedParticleSprite(shape, color, baseSize = 40) {
+  const key = `${shape}_${color}`;
+  if (_particleSpriteCache[key]) return _particleSpriteCache[key];
+
+  try {
+    const offscreen = document.createElement('canvas');
+    offscreen.width = baseSize;
+    offscreen.height = baseSize;
+    const octx = offscreen.getContext('2d');
+    if (!octx) return null;
+
+    const half = baseSize / 2;
+    octx.fillStyle = color;
+
+    if (shape === 'sakura') {
+      octx.translate(half, half);
+      octx.beginPath();
+      octx.moveTo(0, -half * 0.9);
+      octx.bezierCurveTo(half * 0.85, -half * 0.8, half * 0.85, half * 0.55, 0, half * 0.9);
+      octx.bezierCurveTo(-half * 0.85, half * 0.55, -half * 0.85, -half * 0.8, 0, -half * 0.9);
+      octx.fill();
+    } else if (shape === 'heart') {
+      octx.translate(half, half * 0.82);
+      const d = half * 0.58;
+      octx.beginPath();
+      octx.moveTo(0, d * 0.3);
+      octx.bezierCurveTo(-d, -d * 0.6, -d * 1.5, d * 0.6, 0, d * 1.4);
+      octx.bezierCurveTo(d * 1.5, d * 0.6, d, -d * 0.6, 0, d * 0.3);
+      octx.fill();
+    }
+
+    _particleSpriteCache[key] = offscreen;
+    return offscreen;
+  } catch (e) {
+    return null;
+  }
+}
+
 function createParticle(x, y, colorPalette, shape = 'circle', customOpts = {}) {
   const angle = customOpts.angle !== undefined ? customOpts.angle : Math.random() * Math.PI * 2;
   const speed = customOpts.speed !== undefined ? customOpts.speed : (2.5 + Math.random() * 5.5);
@@ -1761,7 +1802,8 @@ function createParticle(x, y, colorPalette, shape = 'circle', customOpts = {}) {
     tiltSpeed: (Math.random() - 0.5) * 0.15,
     gravity: customOpts.gravity !== undefined ? customOpts.gravity : 0.2,
     drag: customOpts.drag !== undefined ? customOpts.drag : 0.98,
-    shape
+    shape,
+    isAmbient: Boolean(customOpts.isAmbient)
   };
 }
 
@@ -1781,7 +1823,9 @@ function spawnBurstAtElement(element, colorPalette, shape = 'circle', count = 22
   }
 }
 
-function animateParticles() {
+let lastAmbientFrameTime = 0;
+
+function animateParticles(timestamp = performance.now()) {
   if (document.hidden) {
     animFrameId = null;
     return;
@@ -1794,6 +1838,15 @@ function animateParticles() {
     animFrameId = null;
     return;
   }
+
+  // Throttle ambient-only drift to ~36 FPS (every 28ms) on high-refresh ProMotion screens (120Hz).
+  // Burst particles (clicks, jumps, unlocks) bypass throttle and run at full native display rate.
+  const hasBurst = particles.some(p => !p.isAmbient);
+  if (!hasBurst && shouldRunKawaiiAmbient && (timestamp - lastAmbientFrameTime < 28)) {
+    animFrameId = requestAnimationFrame(animateParticles);
+    return;
+  }
+  lastAmbientFrameTime = timestamp;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -1820,7 +1873,30 @@ function animateParticles() {
 
     const safeAlpha = Math.max(0, Math.min(1, p.alpha));
 
-    if (p.shape === 'rect' || p.shape === 'ribbon') {
+    if (p.shape === 'sakura' || p.shape === 'heart') {
+      const sprite = getCachedParticleSprite(p.shape, p.color);
+      if (sprite) {
+        ctx.save();
+        ctx.globalAlpha = safeAlpha;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        const sz = p.size * 2;
+        ctx.drawImage(sprite, -p.size, -p.size, sz, sz);
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.globalAlpha = safeAlpha;
+        ctx.fillStyle = p.color;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        ctx.beginPath();
+        ctx.moveTo(0, -p.size);
+        ctx.bezierCurveTo(p.size * 0.85, -p.size * 0.85, p.size * 0.85, p.size * 0.6, 0, p.size);
+        ctx.bezierCurveTo(-p.size * 0.85, p.size * 0.6, -p.size * 0.85, -p.size * 0.85, 0, -p.size);
+        ctx.fill();
+        ctx.restore();
+      }
+    } else if (p.shape === 'rect' || p.shape === 'ribbon') {
       ctx.save();
       ctx.globalAlpha = safeAlpha;
       ctx.fillStyle = p.color;
@@ -1842,31 +1918,6 @@ function animateParticles() {
       ctx.lineTo(0, p.size);
       ctx.lineTo(-p.size * 0.75, 0);
       ctx.closePath();
-      ctx.fill();
-      ctx.restore();
-    } else if (p.shape === 'sakura') {
-      ctx.save();
-      ctx.globalAlpha = safeAlpha;
-      ctx.fillStyle = p.color;
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rotation);
-      ctx.beginPath();
-      ctx.moveTo(0, -p.size);
-      ctx.bezierCurveTo(p.size * 0.85, -p.size * 0.85, p.size * 0.85, p.size * 0.6, 0, p.size);
-      ctx.bezierCurveTo(-p.size * 0.85, p.size * 0.6, -p.size * 0.85, -p.size * 0.85, 0, -p.size);
-      ctx.fill();
-      ctx.restore();
-    } else if (p.shape === 'heart') {
-      ctx.save();
-      ctx.globalAlpha = safeAlpha;
-      ctx.fillStyle = p.color;
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.rotation);
-      const d = p.size * 0.65;
-      ctx.beginPath();
-      ctx.moveTo(0, d * 0.3);
-      ctx.bezierCurveTo(-d, -d * 0.6, -d * 1.5, d * 0.6, 0, d * 1.4);
-      ctx.bezierCurveTo(d * 1.5, d * 0.6, d, -d * 0.6, 0, d * 0.3);
       ctx.fill();
       ctx.restore();
     } else if (p.shape === 'bubble') {
@@ -1895,23 +1946,24 @@ function animateParticles() {
     }
   }
 
-  // Ambient gentle sakura & heart drift in Kawaii Mode (capped at 14 particles, paused in The Void or when backgrounded)
+  // Ambient gentle sakura & heart drift in Kawaii Mode (capped at 7 particles, calm zen pace)
   if (shouldRunKawaiiAmbient) {
-    if (particles.length < 14 && Math.random() < 0.08) {
+    if (particles.length < 7 && Math.random() < 0.035) {
       particles.push({
         x: Math.random() * canvas.width,
         y: -15,
-        vx: (Math.random() - 0.4) * 1.1,
-        vy: 0.7 + Math.random() * 1.0,
-        size: 5 + Math.random() * 5,
+        vx: (Math.random() - 0.4) * 0.9,
+        vy: 0.65 + Math.random() * 0.85,
+        size: 5 + Math.random() * 4.5,
         color: ['#fbcfe8', '#f472b6', '#fda4af', '#fce7f3', '#ffffff'][Math.floor(Math.random() * 5)],
         alpha: 0.85,
         decay: 0.0035,
         rotation: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random() - 0.5) * 0.03,
-        shape: Math.random() > 0.35 ? 'sakura' : 'heart',
+        rotSpeed: (Math.random() - 0.5) * 0.025,
+        shape: Math.random() > 0.3 ? 'sakura' : 'heart',
         gravity: 0.012,
-        drag: 0.99
+        drag: 0.99,
+        isAmbient: true
       });
     }
   }
@@ -2455,12 +2507,55 @@ function _unlockTelemetry(tag) {
 
 function _clearDiscoveredTelemetry() {
   try {
+    // 1. Wipe all tracker local storage keys
     localStorage.removeItem(_K_STORE);
+    localStorage.removeItem('im_cosmic_cat_stage');
+    localStorage.removeItem('im_tokens_card_order');
+    localStorage.removeItem('im_tokens_fx_mode');
+
+    // Purge any other im_* or im-* keys
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('im_') || k.startsWith('im-'))) {
+        try { localStorage.removeItem(k); } catch (e) {}
+      }
+    }
   } catch (e) {}
+
+  // 2. Clear dev date override
+  delete window.__SPACE_DATE_OVERRIDE__;
+
+  // 3. Reset Cosmic Guardian Cat to Stage 0 (4,000m)
+  if (typeof window.__setCosmicCatStage === 'function') {
+    window.__setCosmicCatStage(0);
+  }
+  try { localStorage.removeItem('im_cosmic_cat_stage'); } catch (e) {}
+
+  // 4. Reset 3D Easter Egg claimed state
+  const easterEgg3D = document.getElementById('easterEgg3D');
+  if (easterEgg3D) {
+    easterEgg3D.classList.remove('claimed');
+  }
+
+  // 5. Reset Course Cards to initial layout order
+  const grid = document.getElementById('courseCardsGrid');
+  const cardGetxr = document.getElementById('cardGetxr');
+  const card3dma = document.getElementById('card3dma');
+  if (grid && cardGetxr && card3dma) {
+    grid.appendChild(cardGetxr);
+    grid.appendChild(card3dma);
+  }
+
+  // 6. Update Telemetry UI (resets counter badge to 0/14)
   _updateTelemetryUI();
+
+  // 7. Audio & Toast feedback
   if (isJuicyMode) {
     SoundEngine.playTelemetryReset();
-    _notifyTelemetry(atob('U2VjcmV0cyBjb3VudGVyIHJlc2V0OiAwLzEy'));
+    const msg = isKawaiiMode
+      ? `All progress & secrets reset nya! (0/${_0xM.length}) 🐾`
+      : `All progress & secrets reset (0/${_0xM.length})!`;
+    _notifyTelemetry(msg);
   }
 }
 
