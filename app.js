@@ -2996,13 +2996,16 @@ function _setupUnderTheCListener() {
       return;
     }
 
+    if (!isSoundEnabled) {
+      _notifyTelemetry('🦀 .... [silence] ....');
+      return;
+    }
+
     const { isNew, totalFound } = _unlockTelemetry('0xen');
     const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
     _notifyTelemetry(`🦀 Under the C! Under the C!${suffix}`);
 
-    if (isSoundEnabled) {
-      SoundEngine.playUnderTheSea();
-    }
+    SoundEngine.playUnderTheSea();
 
     // Aquatic bubble burst rising upward from Under the C
     if (canvas && ctx) {
