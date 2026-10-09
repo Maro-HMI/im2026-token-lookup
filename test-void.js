@@ -1394,9 +1394,16 @@ function updateKawaiiStaticTexts(active) {
   if (headerTitle) {
     _saveAndSetText('headerTitle', headerTitle, 'IM 2026 Token Lookup ~desu! (ฅ^•ᴥ•^ฅ)', active);
   }
-  const headerSub = document.querySelector('header .bg-slate-100');
+  const headerSub = document.getElementById('headerSubBadge') || document.querySelector('header .bg-slate-100') || document.querySelector('header .bg-pink-50');
   if (headerSub) {
     _saveAndSetText('headerSub', headerSub, 'GETXR & 3DMA nya~ 🐾', active);
+    if (active) {
+      headerSub.classList.remove('bg-slate-100', 'border-slate-200', 'text-slate-600');
+      headerSub.classList.add('bg-pink-50', 'border-pink-200', 'text-pink-600');
+    } else {
+      headerSub.classList.remove('bg-pink-50', 'border-pink-200', 'text-pink-600');
+      headerSub.classList.add('bg-slate-100', 'border-slate-200', 'text-slate-600');
+    }
   }
 
   // 2. Hero title & subtitle
