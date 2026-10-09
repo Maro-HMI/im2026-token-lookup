@@ -1606,6 +1606,34 @@ body.kawaii-mode.in-the-void #easterEgg3D .egg-mesh {
   box-shadow: 0 0 35px rgba(244, 114, 182, 0.85), 0 0 70px rgba(236, 72, 153, 0.45) !important;
 }
 
+/* ==========================================================================
+   Secret #14: Under the C
+   ========================================================================== */
+.under-c-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.secret-under-c-hit {
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  top: 40%;
+  bottom: -22px;
+  cursor: default;
+  z-index: 15;
+  text-decoration: none;
+  background: transparent;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body.juicy-mode .secret-under-c-hit,
+body.kawaii-mode .secret-under-c-hit {
+  cursor: pointer;
+}
+
+
 
 
 

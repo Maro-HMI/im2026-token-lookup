@@ -1108,6 +1108,80 @@ const SoundEngine = (() => {
       playTone({ freqStart: 540 * norm, freqEnd: 320 * norm, type: 'triangle', duration: 0.11, gainPeak: 0.10 * norm, delay: 0.04, filterFreq: 2200 });
     },
 
+    // 19. Secret #14 (0xen) — "Under the C" Calypso Steel-Pan Jingle
+    playUnderTheSea() {
+      if (!canPlay()) return;
+      const melody = [
+        // [delaySec, freqHz, durSec, gainPeak]
+        // Pickup: "Un-"
+        [0.00, 392.00, 0.12, 0.11], // G4
+        // "-der the sea!"
+        [0.14, 523.25, 0.14, 0.13], // C5
+        [0.28, 659.25, 0.16, 0.13], // E5
+        [0.46, 523.25, 0.26, 0.15], // C5
+
+        // Steel drum calypso fill
+        [0.74, 659.25, 0.10, 0.08], // E5
+        [0.86, 783.99, 0.12, 0.09], // G5
+
+        // "Un-der the sea!"
+        [1.02, 392.00, 0.12, 0.11], // G4
+        [1.16, 523.25, 0.14, 0.13], // C5
+        [1.30, 659.25, 0.16, 0.13], // E5
+        [1.48, 523.25, 0.28, 0.15], // C5
+
+        // "Dar-ling it's bet-ter"
+        [1.82, 659.25, 0.11, 0.12], // E5
+        [1.95, 698.46, 0.11, 0.12], // F5
+        [2.08, 783.99, 0.12, 0.13], // G5
+        [2.22, 880.00, 0.14, 0.14], // A5
+        [2.38, 783.99, 0.12, 0.13], // G5
+        [2.52, 698.46, 0.12, 0.12], // F5
+        [2.66, 659.25, 0.16, 0.13], // E5
+
+        // "down where it's wet-ter"
+        [2.86, 587.33, 0.11, 0.12], // D5
+        [2.99, 659.25, 0.11, 0.12], // E5
+        [3.12, 698.46, 0.12, 0.13], // F5
+        [3.26, 783.99, 0.14, 0.14], // G5
+        [3.42, 698.46, 0.12, 0.13], // F5
+        [3.56, 659.25, 0.12, 0.12], // E5
+        [3.70, 587.33, 0.16, 0.13], // D5
+
+        // "take it from me!"
+        [3.90, 523.25, 0.14, 0.13], // C5
+        [4.06, 587.33, 0.14, 0.13], // D5
+        [4.22, 659.25, 0.18, 0.14], // E5
+        // Final celebratory major chord with high shimmer
+        [4.44, 523.25, 0.45, 0.15], // C5
+        [4.44, 659.25, 0.45, 0.11], // E5
+        [4.44, 783.99, 0.45, 0.11], // G5
+        [4.44, 1046.50, 0.55, 0.12] // C6
+      ];
+
+      melody.forEach(([d, f, dur, g]) => {
+        // Steel pan fundamental body with subtle attack transient pitch-bend
+        playTone({
+          freqStart: f * 1.035,
+          freqEnd: f,
+          type: 'triangle',
+          duration: dur,
+          gainPeak: g,
+          delay: d,
+          filterFreq: 3400
+        });
+        // Resonant harmonic overtone (gives the distinct steel drum pan ring)
+        playTone({
+          freqStart: f * 2.0,
+          type: 'sine',
+          duration: dur * 0.65,
+          gainPeak: g * 0.42,
+          delay: d + 0.002,
+          filterFreq: 4600
+        });
+      });
+    },
+
     suspendCtx() {
       if (audioCtx && audioCtx.state === 'running') {
         audioCtx.suspend().catch(() => {});
@@ -1300,9 +1374,13 @@ function updateKawaiiStaticTexts(active) {
   }
 
   // 2. Hero title & subtitle
-  const heroTitle = document.querySelector('#mainContainer h2');
+  const heroTitle = document.getElementById('heroTitleText') || document.querySelector('#mainContainer h2');
   if (heroTitle) {
-    _saveAndSetText('heroTitle', heroTitle, 'Check Late Token Balance ~desu! (ฅ^•ᴥ•^ฅ)', active);
+    if (heroTitle.id === 'heroTitleText') {
+      _saveAndSetText('heroTitle', heroTitle, 'heck Late Token Balance ~desu! (ฅ^•ᴥ•^ฅ)', active);
+    } else {
+      _saveAndSetText('heroTitle', heroTitle, 'Check Late Token Balance ~desu! (ฅ^•ᴥ•^ฅ)', active);
+    }
   }
   const heroSub = document.querySelector('#mainContainer p.text-slate-500');
   if (heroSub) {
@@ -1756,6 +1834,22 @@ function animateParticles() {
       ctx.moveTo(0, d * 0.3);
       ctx.bezierCurveTo(-d, -d * 0.6, -d * 1.5, d * 0.6, 0, d * 1.4);
       ctx.bezierCurveTo(d * 1.5, d * 0.6, d, -d * 0.6, 0, d * 0.3);
+      ctx.fill();
+      ctx.restore();
+    } else if (p.shape === 'bubble') {
+      ctx.save();
+      ctx.globalAlpha = safeAlpha;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 1.6;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // Shimmer reflection highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.beginPath();
+      ctx.arc(p.x - p.size * 0.35, p.y - p.size * 0.35, Math.max(1, p.size * 0.28), 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     } else {
@@ -2264,7 +2358,7 @@ function handleClearSearch() {
 
 const _K_STORE = atob('aW1fdG9rZW5zX2Rpc2NvdmVyZWRfZWdncw==');
 
-// Subsystem telemetry manifest (13 secrets)
+// Subsystem telemetry manifest (14 secrets)
 const _0xM = [
   { id: '0x1a', name: atob('VG9rZW4gQ29pbiBGbGlw') },       // Token Coin Flip
   { id: '0x2b', name: atob('RG8gYSBCYXJyZWwgUm9sbA==') },   // Do a Barrel Roll
@@ -2278,7 +2372,8 @@ const _0xM = [
   { id: '0xaj', name: atob('R3VhcmRpYW4ncyBCbGVzc2luZw==') }, // Guardian's Blessing
   { id: '0xbk', name: atob('T3JiaXRhbCBBc2NlbnQ=') },       // Orbital Ascent
   { id: '0xcl', name: atob('R3Jhdml0eSBNb2Rl') },           // Gravity Mode
-  { id: '0xdm', name: atob('S2F3YWlpIE1vZGU=') }            // Kawaii Mode
+  { id: '0xdm', name: atob('S2F3YWlpIE1vZGU=') },          // Kawaii Mode
+  { id: '0xen', name: atob('VW5kZXIgdGhlIEM=') }            // Under the C
 ];
 
 function _getDiscoveredTelemetry() {
@@ -2860,6 +2955,49 @@ function _setupLogoListener() {
       const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
       _notifyTelemetry(`${atob('QXNzZXQgaW5zcGVjdGVkOiBTaGFkZXJzIGNvbXBpbGVkIQ==')}${suffix}`);
     });
+  });
+}
+
+// 14. Secret #14: Under the C
+function _setupUnderTheCListener() {
+  const link = document.getElementById('secretUnderCLink');
+  if (!link) return;
+
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!isJuicyMode) {
+      _notifyTelemetry('Switch to Juicy Mode to unlock secrets!');
+      return;
+    }
+
+    const { isNew, totalFound } = _unlockTelemetry('0xen');
+    const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
+    _notifyTelemetry(`🦀 Darling it's better down where it's wetter! Under the C!${suffix}`);
+
+    if (isSoundEnabled) {
+      SoundEngine.playUnderTheSea();
+    }
+
+    // Aquatic bubble burst rising upward from Under the C
+    if (canvas && ctx) {
+      resizeCanvas();
+      const rect = link.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const bubbleColors = ['#06b6d4', '#0891b2', '#38bdf8', '#34d399', '#22d3ee', '#ffffff', '#f43f5e'];
+      for (let i = 0; i < 28; i++) {
+        particles.push(createParticle(centerX, centerY, bubbleColors, 'bubble', {
+          gravity: -0.06,
+          vyOffset: -3.6,
+          speed: 1.8 + Math.random() * 3.4,
+          size: 4 + Math.random() * 7.5,
+          decay: 0.011 + Math.random() * 0.014
+        }));
+      }
+      if (!animFrameId && !document.hidden) {
+        animateParticles();
+      }
+    }
   });
 }
 
@@ -4787,6 +4925,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   _setupFlipListener();
   _setupTicketListener();
   _setupLogoListener();
+  _setupUnderTheCListener();
   _setupGuardianCatListener();
   setupCardTilt();
   setupCardDrag();
