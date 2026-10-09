@@ -1183,7 +1183,7 @@ body.in-the-void #voidAltimeter.visible {
   transition: width 0.1s linear;
 }
 
-/* 4. Cosmic Guardian Cat in Orbit (Y ≈ 5500m) */
+/* 4. Cosmic Guardian Cat in Orbit (Multi-Tier Altitude Chase) */
 #cosmicCat3D {
   display: none;
 }
@@ -1195,11 +1195,21 @@ body.in-the-void #cosmicCat3D {
   height: 140px;
   left: -65px;
   top: -70px;
-  transform: translate3d(0px, -5500px, -160px);
+  transform: translate3d(0px, -4000px, -160px);
   transform-style: preserve-3d;
   cursor: pointer;
   pointer-events: auto;
   user-select: none;
+  transition: opacity 0.4s ease;
+}
+
+body.in-the-void #cosmicCat3D.cat-fleeing {
+  transition: transform 1.25s cubic-bezier(0.2, 0.95, 0.35, 1.15), opacity 0.45s ease 0.85s !important;
+  pointer-events: none;
+}
+
+.cosmic-cat-mesh {
+  transform-style: preserve-3d;
   animation: cosmicFloat 4.2s ease-in-out infinite alternate;
 }
 
@@ -1209,9 +1219,9 @@ body.in-the-void #cosmicCat3D.claimed .cosmic-cat-helmet {
 }
 
 @keyframes cosmicFloat {
-  0% { transform: translate3d(0px, -5500px, -160px) rotateY(0deg) rotateZ(-3deg); }
-  50% { transform: translate3d(20px, -5535px, -140px) rotateY(12deg) rotateZ(3deg); }
-  100% { transform: translate3d(-15px, -5480px, -180px) rotateY(-8deg) rotateZ(-2deg); }
+  0% { transform: translate3d(0px, 0px, 0px) rotateY(0deg) rotateZ(-3deg); }
+  50% { transform: translate3d(20px, -35px, 20px) rotateY(12deg) rotateZ(3deg); }
+  100% { transform: translate3d(-15px, 20px, -20px) rotateY(-8deg) rotateZ(-2deg); }
 }
 
 .cosmic-cat-helmet {

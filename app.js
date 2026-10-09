@@ -3451,6 +3451,110 @@ function init3DVoidModule() {
     }
   }
 
+  // Multi-tier Time Gated Altitude & Cosmic Guardian Cat Chase System
+  const _CAT_STAGE_KEY = 'im_cosmic_cat_stage';
+
+  const CAT_STAGE_CONFIG = [
+    { stage: 0, alt: 4000, nextAlt: 5000 },
+    { stage: 1, alt: 5000, nextAlt: 6000 },
+    { stage: 2, alt: 6000, nextAlt: 8000 },
+    { stage: 3, alt: 8000, nextAlt: 9500 },
+    { stage: 4, alt: 9500, nextAlt: 9500 }
+  ];
+
+  const SPACE_TIME_GATES = [
+    { timestamp: new Date(2026, 9, 15, 0, 0, 0).getTime(), maxAltitude: 5500 }, // Oct 15
+    { timestamp: new Date(2026, 9, 21, 0, 0, 0).getTime(), maxAltitude: 6500 }, // Oct 21
+    { timestamp: new Date(2026, 9, 28, 0, 0, 0).getTime(), maxAltitude: 8500 }, // Oct 28
+    { timestamp: new Date(2026, 10, 4, 0, 0, 0).getTime(), maxAltitude: 10000 } // Nov 4
+  ];
+
+  function getSpaceDateNow() {
+    if (window.__SPACE_DATE_OVERRIDE__) {
+      return new Date(window.__SPACE_DATE_OVERRIDE__);
+    }
+    return new Date();
+  }
+
+  function getSpaceCeiling() {
+    const now = getSpaceDateNow();
+    const t = now.getTime();
+    let maxAlt = 4500;
+    for (const gate of SPACE_TIME_GATES) {
+      if (t >= gate.timestamp) {
+        maxAlt = gate.maxAltitude;
+      }
+    }
+    return maxAlt;
+  }
+
+  function getCosmicCatStage() {
+    try {
+      const raw = localStorage.getItem(_CAT_STAGE_KEY);
+      if (raw === null) return 0;
+      const n = parseInt(raw, 10);
+      return isNaN(n) ? 0 : Math.max(0, Math.min(4, n));
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function setCosmicCatStage(stage) {
+    try {
+      localStorage.setItem(_CAT_STAGE_KEY, String(stage));
+    } catch (e) {}
+  }
+
+  function getCatAltitude() {
+    const stage = getCosmicCatStage();
+    const cfg = CAT_STAGE_CONFIG[stage] || CAT_STAGE_CONFIG[0];
+    return cfg.alt;
+  }
+
+  function initCosmicCatPosition() {
+    if (!cosmicCat3D) return;
+    const stage = getCosmicCatStage();
+    const cfg = CAT_STAGE_CONFIG[stage] || CAT_STAGE_CONFIG[0];
+    cosmicCat3D.classList.remove('claimed', 'cat-fleeing');
+    cosmicCat3D.style.transition = '';
+    cosmicCat3D.style.transform = `translate3d(0px, -${cfg.alt}px, -160px)`;
+    cosmicCat3D.style.opacity = '1';
+
+    const badgeText = document.getElementById('cosmicCatBadgeText');
+    if (badgeText) {
+      badgeText.textContent = `COSMIC GUARDIAN CAT • ${cfg.alt.toLocaleString()}m`;
+    }
+    const faceEl = document.getElementById('cosmicCatFace');
+    if (faceEl) {
+      faceEl.textContent = '(=^･ω･^=)';
+    }
+  }
+
+  window.__setCosmicCatStage = function(stage) {
+    setCosmicCatStage(stage);
+    initCosmicCatPosition();
+    console.log(`[Space Engine] Cosmic Cat stage set to ${stage} (alt: ${getCatAltitude()}m). Ceiling: ${getSpaceCeiling()}m`);
+  };
+
+  window.__setSpaceDateOverride = function(dateStr) {
+    window.__SPACE_DATE_OVERRIDE__ = dateStr;
+    console.log(`[Space Engine] Date override set to ${dateStr}. Current ceiling: ${getSpaceCeiling()}m`);
+  };
+
+  window.__resetSpaceDateOverride = function() {
+    delete window.__SPACE_DATE_OVERRIDE__;
+    console.log(`[Space Engine] Date override reset. Current ceiling: ${getSpaceCeiling()}m`);
+  };
+
+  window.__getSpaceStatus = function() {
+    return {
+      stage: getCosmicCatStage(),
+      catAltitude: getCatAltitude(),
+      maxCeiling: getSpaceCeiling(),
+      currentDate: getSpaceDateNow().toISOString()
+    };
+  };
+
   let isHoldingKey = false;
   let holdStartTime = 0;
   let shakeRafId = null;
@@ -3807,9 +3911,7 @@ function init3DVoidModule() {
     if (easterEgg3D) {
       easterEgg3D.classList.remove('claimed');
     }
-    if (cosmicCat3D) {
-      cosmicCat3D.classList.remove('claimed');
-    }
+    initCosmicCatPosition();
     maxAltitudeReached = 0;
     hasEnteredOrbitSoundPlayed = false;
 
@@ -4076,8 +4178,9 @@ function init3DVoidModule() {
         camVy = Math.max(camVy, -34.0);
 
         // Cap max altitude ceiling
-        if (camY > 7000) {
-          camY = 7000;
+        const maxCeiling = getSpaceCeiling();
+        if (camY > maxCeiling) {
+          camY = maxCeiling;
           camVy = Math.min(camVy, 0);
         }
 
@@ -4085,11 +4188,11 @@ function init3DVoidModule() {
           maxAltitudeReached = camY;
         }
 
-        // Entering orbit chime (once per ascent above 5000m)
-        if (camY >= 5000 && !hasEnteredOrbitSoundPlayed) {
+        // Entering orbit chime (once per ascent above 3800m)
+        if (camY >= 3800 && !hasEnteredOrbitSoundPlayed) {
           hasEnteredOrbitSoundPlayed = true;
           SoundEngine.playOrbitalEntry();
-        } else if (camY < 3500) {
+        } else if (camY < 2500) {
           hasEnteredOrbitSoundPlayed = false;
         }
 
@@ -4136,11 +4239,14 @@ function init3DVoidModule() {
       // Dynamic Atmospheric Visuals based on current altitude
       updateAtmosphericVisuals(camY, camVy);
 
-      // Proximity check for Cosmic Guardian Cat (Y ≈ 5500, X ≈ 0, Z ≈ -160)
-      if (camY >= 5100 && camY <= 5900) {
-        const catDist = Math.hypot(camX - 0, (camY - 5500), camZ - (-160));
-        if (catDist < 280) {
-          triggerOrbitalCatUnlock();
+      // Proximity check for Cosmic Guardian Cat
+      if (!isCatFleeing && cosmicCat3D && !cosmicCat3D.classList.contains('claimed')) {
+        const catAlt = getCatAltitude();
+        if (Math.abs(camY - catAlt) <= 300) {
+          const catDist = Math.hypot(camX - 0, (camY - catAlt), camZ - (-160));
+          if (catDist < 260) {
+            triggerOrbitalCatChase();
+          }
         }
       }
 
@@ -4187,19 +4293,42 @@ function init3DVoidModule() {
   }
 
   // 7. Cosmic Guardian Cat (0xbk) Interaction
+  let isCatFleeing = false;
+
   if (cosmicCat3D) {
     cosmicCat3D.addEventListener('click', (e) => {
       e.stopPropagation();
-      triggerOrbitalCatUnlock();
+      if (isCatFleeing || cosmicCat3D.classList.contains('claimed')) return;
+      const catAlt = getCatAltitude();
+      const catDist = Math.hypot(camX - 0, (camY - catAlt), camZ - (-160));
+      // Guard: must be within 380px distance so player cannot click from far below
+      if (catDist < 380) {
+        triggerOrbitalCatChase();
+      }
     });
   }
 
-  function triggerOrbitalCatUnlock() {
+  function triggerOrbitalCatChase() {
     if (!isJuicyMode) return;
+    if (isCatFleeing) return;
     if (cosmicCat3D && cosmicCat3D.classList.contains('claimed')) return;
+
+    const stage = getCosmicCatStage();
+    const config = CAT_STAGE_CONFIG[stage] || CAT_STAGE_CONFIG[CAT_STAGE_CONFIG.length - 1];
+
+    if (stage >= 4) {
+      // Stage 4+ is Nov 4 highest tier, final secret reserved
+      return;
+    }
+
+    isCatFleeing = true;
     if (cosmicCat3D) cosmicCat3D.classList.add('claimed');
 
     SoundEngine.playOrbitalPurr();
+
+    // Startled face
+    const faceEl = document.getElementById('cosmicCatFace');
+    if (faceEl) faceEl.textContent = '(=O.O=) 💨';
 
     // Cosmic stardust celebration ring around cat
     if (canvas && ctx) {
@@ -4226,10 +4355,64 @@ function init3DVoidModule() {
       if (!animFrameId) animateParticles();
     }
 
-    const { isNew, totalFound } = _unlockTelemetry('0xbk');
-    const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
-    _notifyTelemetry(`Orbital Ascent: Escaped the gravitational pull of deadlines!${suffix}`);
-    _dispenseCelebrationParticles();
+    // Telemetry: First chase unlocks Secret #11 (0xbk); subsequent chases show chased away message
+    if (stage === 0) {
+      const { isNew, totalFound } = _unlockTelemetry('0xbk');
+      const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
+      _notifyTelemetry(`Orbital Ascent: Escaped the gravitational pull of deadlines!${suffix}`);
+      _dispenseCelebrationParticles();
+    } else {
+      _notifyTelemetry(`🐾 The Guardian Cat has been chased away!`);
+      _dispenseCelebrationParticles();
+    }
+
+    // Advance stage
+    const nextStage = stage + 1;
+    setCosmicCatStage(nextStage);
+    const nextAlt = config.nextAlt;
+
+    // After a brief startled pause (380ms), quick flee animation going higher
+    setTimeout(() => {
+      if (cosmicCat3D) {
+        cosmicCat3D.classList.add('cat-fleeing');
+        cosmicCat3D.style.transform = `translate3d(0px, -${nextAlt}px, -160px) scale(0.65)`;
+        cosmicCat3D.style.opacity = '0';
+      }
+
+      // Downward stardust propulsion trail
+      if (canvas && ctx) {
+        const cx = window.innerWidth / 2;
+        const cy = window.innerHeight * 0.45;
+        for (let i = 0; i < 28; i++) {
+          particles.push({
+            x: cx + (Math.random() - 0.5) * 60,
+            y: cy + Math.random() * 20,
+            vx: (Math.random() - 0.5) * 3.5,
+            vy: 4.5 + Math.random() * 8.0,
+            size: 2.5 + Math.random() * 3.5,
+            color: '#38bdf8',
+            alpha: 1.0,
+            decay: 0.035,
+            shape: 'circle'
+          });
+        }
+        if (!animFrameId) animateParticles();
+      }
+
+      setTimeout(() => {
+        isCatFleeing = false;
+        if (cosmicCat3D) {
+          cosmicCat3D.classList.remove('cat-fleeing', 'claimed');
+          cosmicCat3D.style.transform = `translate3d(0px, -${nextAlt}px, -160px)`;
+          cosmicCat3D.style.opacity = '1';
+          const badgeText = document.getElementById('cosmicCatBadgeText');
+          if (badgeText) {
+            badgeText.textContent = `COSMIC GUARDIAN CAT • ${nextAlt.toLocaleString()}m`;
+          }
+          if (faceEl) faceEl.textContent = '(=^･ω･^=)';
+        }
+      }, 1300);
+    }, 380);
   }
 
   // Altitude Tiers & Dynamic Visuals
@@ -4237,13 +4420,17 @@ function init3DVoidModule() {
     if (isKawaiiMode) {
       if (y < 500) return { tier: 0, name: 'Cotton Ground-nya 🌸' };
       if (y < 2000) return { tier: 1, name: 'Candy Clouds ~desu ☁️' };
-      if (y < 5000) return { tier: 2, name: 'Pastel Sky nya~ ✨' };
-      return { tier: 3, name: 'Starry Dream ~desu 🌟' };
+      if (y < 4500) return { tier: 2, name: 'Pastel Sky nya~ ✨' };
+      if (y < 7000) return { tier: 3, name: 'Cosmic Stardust nya~ 🌌' };
+      if (y < 9000) return { tier: 4, name: 'Starry Dream ~desu 🌟' };
+      return { tier: 5, name: 'Infinite Cosmos nya~ 🚀' };
     }
     if (y < 500) return { tier: 0, name: 'Ground Studio' };
     if (y < 2000) return { tier: 1, name: 'Troposphere' };
-    if (y < 5000) return { tier: 2, name: 'Stratosphere' };
-    return { tier: 3, name: 'Deep Orbit' };
+    if (y < 4500) return { tier: 2, name: 'Stratosphere' };
+    if (y < 7000) return { tier: 3, name: 'Mesosphere' };
+    if (y < 9000) return { tier: 4, name: 'Thermosphere' };
+    return { tier: 5, name: 'Deep Orbit' };
   }
 
   function getAtmosphericBgColor(y) {
@@ -4393,7 +4580,8 @@ function init3DVoidModule() {
         }
       }
       if (altimeterGaugeFill) {
-        const pct = Math.min(100, Math.max(0, (y / 6000) * 100)).toFixed(1);
+        const ceiling = getSpaceCeiling();
+        const pct = Math.min(100, Math.max(0, (y / ceiling) * 100)).toFixed(1);
         if (pct !== _lastGaugePct) {
           _lastGaugePct = pct;
           altimeterGaugeFill.style.width = `${pct}%`;
