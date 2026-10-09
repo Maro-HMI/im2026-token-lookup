@@ -889,24 +889,32 @@ function updateSoundUI() {
   soundBtn.classList.remove('hidden');
 
   if (isSoundEnabled) {
-    soundBtn.className = 'text-xs px-2.5 py-1.5 rounded-full border border-blue-200 bg-blue-50/70 hover:bg-blue-50 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0';
-    soundBtn.setAttribute('title', 'Mute sound effects');
+    soundBtn.className = isKawaiiMode
+      ? 'text-xs px-2.5 py-1.5 rounded-full border border-pink-200 bg-pink-50/80 hover:bg-pink-100/70 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0'
+      : 'text-xs px-2.5 py-1.5 rounded-full border border-blue-200 bg-blue-50/70 hover:bg-blue-50 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0';
+    soundBtn.setAttribute('title', isKawaiiMode ? 'Mute sound effects nya~' : 'Mute sound effects');
     if (soundIcon) {
-      soundIcon.innerHTML = `<svg class="w-3.5 h-3.5 text-blue-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+      soundIcon.innerHTML = isKawaiiMode
+        ? `<svg class="w-3.5 h-3.5 text-pink-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`
+        : `<svg class="w-3.5 h-3.5 text-blue-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
     }
     if (soundLabel) {
-      soundLabel.className = 'text-[11px] font-semibold text-blue-700';
-      soundLabel.textContent = 'Sound On';
+      soundLabel.className = isKawaiiMode ? 'text-[11px] font-semibold text-pink-700' : 'text-[11px] font-semibold text-blue-700';
+      soundLabel.textContent = isKawaiiMode ? 'Sound On-nya! 🐾' : 'Sound On';
     }
   } else {
-    soundBtn.className = 'text-xs px-2.5 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0';
-    soundBtn.setAttribute('title', 'Enable sound effects (resets on reload)');
+    soundBtn.className = isKawaiiMode
+      ? 'text-xs px-2.5 py-1.5 rounded-full border border-pink-200 bg-white hover:bg-pink-50/60 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0'
+      : 'text-xs px-2.5 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0';
+    soundBtn.setAttribute('title', isKawaiiMode ? 'Enable cute sounds ~desu! ✨' : 'Enable sound effects (resets on reload)');
     if (soundIcon) {
-      soundIcon.innerHTML = `<svg class="w-3.5 h-3.5 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></svg>`;
+      soundIcon.innerHTML = isKawaiiMode
+        ? `<svg class="w-3.5 h-3.5 text-pink-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></svg>`
+        : `<svg class="w-3.5 h-3.5 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></svg>`;
     }
     if (soundLabel) {
-      soundLabel.className = 'text-[11px] font-medium text-slate-500';
-      soundLabel.textContent = 'Sound Off';
+      soundLabel.className = isKawaiiMode ? 'text-[11px] font-medium text-pink-500' : 'text-[11px] font-medium text-slate-500';
+      soundLabel.textContent = isKawaiiMode ? 'Sound Off nya (´-ω-｀)' : 'Sound Off';
     }
   }
 }
@@ -989,6 +997,145 @@ let isKawaiiMode = false;
 let _origHeroSubtitle = null;
 let _origPlaceholder = null;
 let _origSubmitText = null;
+
+// ==========================================================================
+// Kawaii Anime Cat Language (Localization & Microcopy Engine)
+// ==========================================================================
+const _origUiStrings = {};
+
+function _saveAndSet(key, el, text, active) {
+  if (!el) return;
+  if (_origUiStrings[key] === undefined) {
+    _origUiStrings[key] = el.innerHTML;
+  }
+  el.innerHTML = active ? text : _origUiStrings[key];
+}
+
+function _saveAndSetText(key, el, text, active) {
+  if (!el) return;
+  if (_origUiStrings[key] === undefined) {
+    _origUiStrings[key] = el.textContent;
+  }
+  el.textContent = active ? text : _origUiStrings[key];
+}
+
+function cutifyLedgerReason(reason) {
+  if (!reason) return 'Token update-nya! ✨';
+  let t = reason.trim();
+  if (t.endsWith('.')) t = t.slice(0, -1);
+  if (/initial/i.test(t)) return `${t} ~desu 🐾`;
+  if (/attendance|wooclap/i.test(t)) return `${t} nya~! 🌸`;
+  if (/bonus|wrapup|extra|credit/i.test(t)) return `${t}-nya! 🎁`;
+  if (/spent|extension|assignment|late/i.test(t)) return `${t} nya~ ⏰`;
+  return `${t} ~desu ✨`;
+}
+
+function updateKawaiiStaticTexts(active) {
+  // 1. Header title & subtitle
+  const headerTitle = document.querySelector('header h1');
+  if (headerTitle) {
+    _saveAndSetText('headerTitle', headerTitle, 'IM 2026 Token Lookup ~desu! (✿◠‿◠)', active);
+  }
+  const headerSub = document.querySelector('header .bg-slate-100');
+  if (headerSub) {
+    _saveAndSetText('headerSub', headerSub, 'GETXR & 3DMA nya~ 🐾', active);
+  }
+
+  // 2. Hero title & subtitle
+  const heroTitle = document.querySelector('#mainContainer h2');
+  if (heroTitle) {
+    _saveAndSetText('heroTitle', heroTitle, 'Check Late Token Balance ~desu! (◕‿◕✿)', active);
+  }
+  const heroSub = document.querySelector('#mainContainer p.text-slate-500');
+  if (heroSub) {
+    _saveAndSetText('heroSub', heroSub, 'Check your late tokens, Wooclap credits & extension stars-nya! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ ~desu', active);
+  }
+
+  // 3. Search Form helper & input label
+  const formHelper = document.querySelector('#tokenForm + p, #tokenForm p.text-slate-500');
+  if (formHelper) {
+    _saveAndSetText('formHelper', formHelper, "Accepts 7-digit student number with or without 's' nya~ (e.g. s1234567)! Bookmarks supported ~desu ✨", active);
+  }
+  const inputLabel = document.querySelector('#tokenForm span.font-mono');
+  if (inputLabel) {
+    _saveAndSetText('inputLabel', inputLabel, 'ID nya:', active);
+  }
+
+  // 4. Student record header & Clear button
+  const recordLabel = document.querySelector('#resultsContainer .bg-blue-50\\/80 span.font-medium');
+  if (recordLabel) {
+    _saveAndSetText('recordLabel', recordLabel, 'Student record-nya:', active);
+  }
+  const clearBtn = document.getElementById('clearSearchBtn');
+  if (clearBtn) {
+    _saveAndSetText('clearBtn', clearBtn, 'Look up another ID nya~ 🔍', active);
+  }
+
+  // 5. Bookmark tip banner
+  const bookmarkBanner = document.querySelector('#resultsContainer .bg-amber-50\\/70 span:not(.space-x-2 span)');
+  if (bookmarkBanner) {
+    const originalHtml = '<strong>Bookmark your balance:</strong> Save this URL <span class="hidden sm:inline">(or press <kbd class="px-1.5 py-0.5 font-mono text-[10px] bg-white border border-amber-300 rounded text-amber-900 shadow-2xs">Cmd/Ctrl + D</kbd>)</span> to check anytime.';
+    const kawaiiHtml = '<strong>Bookmark your balance nya~!</strong> Save this URL <span class="hidden sm:inline">(or press <kbd class="px-1.5 py-0.5 font-mono text-[10px] bg-white border border-pink-300 rounded text-pink-900 shadow-2xs">Cmd/Ctrl + D</kbd>)</span> to check anytime ~desu! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧';
+    _saveAndSet('bookmarkBanner', bookmarkBanner, kawaiiHtml, active);
+  }
+
+  // 6. Course card subtitles
+  const getxrSub = document.querySelector('#cardGetxr p.text-slate-500');
+  if (getxrSub) {
+    _saveAndSetText('getxrSub', getxrSub, 'Game Engine Tech & XR Dev-nya 🎮', active);
+  }
+  const threedmaSub = document.querySelector('#card3dma p.text-slate-500');
+  if (threedmaSub) {
+    _saveAndSetText('threedmaSub', threedmaSub, '3D Modeling & Animation-nya 🎨', active);
+  }
+
+  // 7. Policy Info Accordion
+  const policyTitle = document.querySelector('#mainContainer h4.font-heading');
+  if (policyTitle) {
+    const span = policyTitle.querySelector('span');
+    if (span) {
+      _saveAndSetText('policyTitle', span, 'Late Token Rules & Policies ~desu 📖', active);
+    }
+  }
+  const policyBoxes = document.querySelectorAll('#mainContainer .grid-cols-1.sm\\:grid-cols-3 > div');
+  if (policyBoxes && policyBoxes.length === 3) {
+    const titles = [
+      active ? '+24h Extension nya~ ⏰' : '+24h Extension',
+      active ? 'Earn Extra Tokens nya! 🌸' : 'Earn Extra Tokens',
+      active ? 'Grade Bonus ~desu 🏆' : 'Grade Bonus'
+    ];
+    policyBoxes.forEach((box, i) => {
+      const span = box.querySelector('span > span');
+      if (span) {
+        _saveAndSetText(`policyBox${i}`, span, titles[i], active);
+      }
+    });
+  }
+
+  // 8. Footer
+  const footerP1 = document.querySelector('footer p.font-medium');
+  if (footerP1) {
+    _saveAndSetText('footerP1', footerP1, 'Creative Technology · Module 5: Interactive Media ~desu (✿◠‿◠)', active);
+  }
+  const footerP2 = document.querySelector('footer p.text-\\[11px\\]');
+  if (footerP2) {
+    _saveAndSetText('footerP2', footerP2, 'Zero database nya~ · Client-side hash lookup desu · Privacy protected 🐾', active);
+  }
+
+  // 9. Void Controls & Return Button
+  const voidControlsGuide = document.getElementById('voidControlsGuide');
+  if (voidControlsGuide) {
+    const kawaiiControls = '<span>Walk nya: <span class="kbd-pill">W A S D</span></span> <span>•</span> <span>Look: <span class="kbd-pill">Drag</span></span> <span>•</span> <span>Pounce nya: <span class="kbd-pill">Space</span></span> <span>•</span> <span>Zoomies: <span class="kbd-pill">Shift</span></span>';
+    _saveAndSet('voidControlsGuide', voidControlsGuide, kawaiiControls, active);
+  }
+  const returnBtn = document.getElementById('returnToScreenBtn');
+  if (returnBtn) {
+    const span = returnBtn.querySelector('span');
+    if (span) {
+      _saveAndSetText('returnBtnSpan', span, 'Return to Screen nya~ (Esc)', active);
+    }
+  }
+}
 
 function checkFxPreference() {
   const href = window.location.href.toLowerCase();
@@ -1079,19 +1226,21 @@ function setMode(modeOrJuicy, updateUrl = true) {
       spawnBurstAtElement(toggleBtn, ['#fbcfe8', '#f472b6', '#fda4af', '#fce7f3', '#ffffff'], 'sakura', 24);
     }
 
-    if (ticket) ticket.setAttribute('title', 'Inspect golden ticket (◕‿◕✿)');
-    if (getxrLogo) getxrLogo.setAttribute('title', 'Inspect GETXR (* ^ ω ^)');
-    if (threedmaLogo) threedmaLogo.setAttribute('title', 'Inspect 3DMA (o˘◡˘o)');
-    if (getxrBal) getxrBal.setAttribute('title', 'Click to flip token! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧');
-    if (threedmaBal) threedmaBal.setAttribute('title', 'Click to flip token! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧');
+    if (ticket) ticket.setAttribute('title', 'Inspect golden ticket nya~ (◕‿◕✿)');
+    if (getxrLogo) getxrLogo.setAttribute('title', 'Inspect GETXR ~desu (* ^ ω ^)');
+    if (threedmaLogo) threedmaLogo.setAttribute('title', 'Inspect 3DMA ~desu (o˘◡˘o)');
+    if (getxrBal) getxrBal.setAttribute('title', 'Click to flip token nya! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧');
+    if (threedmaBal) threedmaBal.setAttribute('title', 'Click to flip token nya! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧');
 
     // Kaomoji microcopy
-    if (heroSub) heroSub.textContent = 'Check your late tokens, Wooclap credits & extension stars! (◕‿◕✿)';
     if (studentInput) studentInput.placeholder = 'e.g. s1234567 (ฅ^•ﻌ•^ฅ)';
     if (submitBtn) {
       const span = submitBtn.querySelector('span');
-      if (span) span.textContent = 'Check ✨';
+      if (span) span.textContent = 'Check-nya ✨';
     }
+
+    // Apply cute anime cat language to all static UI sections
+    updateKawaiiStaticTexts(true);
 
     // Telemetry & Fanfare
     if (!wasKawaii) {
@@ -1100,7 +1249,7 @@ function setMode(modeOrJuicy, updateUrl = true) {
       }
       const { isNew, totalFound } = _unlockTelemetry('0xdm');
       const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
-      _notifyTelemetry(`✨ Sparkles everywhere! Kawaii Mode unlocked! (｡♥‿♥｡)${suffix}`);
+      _notifyTelemetry(`✨ Sparkles everywhere! Kawaii Mode unlocked nya! (｡♥‿♥｡) ~desu${suffix}`);
       SoundEngine.playKawaiiFanfare();
     }
   } else if (isJuicyMode) {
@@ -1118,8 +1267,8 @@ function setMode(modeOrJuicy, updateUrl = true) {
     if (getxrBal) getxrBal.setAttribute('title', 'Click to flip token!');
     if (threedmaBal) threedmaBal.setAttribute('title', 'Click to flip token!');
 
-    // Restore original microcopy
-    if (heroSub && _origHeroSubtitle) heroSub.textContent = _origHeroSubtitle;
+    // Restore original UI texts & microcopy
+    updateKawaiiStaticTexts(false);
     if (studentInput && _origPlaceholder) studentInput.placeholder = _origPlaceholder;
     if (submitBtn && _origSubmitText) {
       const span = submitBtn.querySelector('span');
@@ -1154,8 +1303,8 @@ function setMode(modeOrJuicy, updateUrl = true) {
       card3dma.classList.remove('tilt-card-reset');
     }
 
-    // Restore original microcopy
-    if (heroSub && _origHeroSubtitle) heroSub.textContent = _origHeroSubtitle;
+    // Restore original UI texts & microcopy
+    updateKawaiiStaticTexts(false);
     if (studentInput && _origPlaceholder) studentInput.placeholder = _origPlaceholder;
     if (submitBtn && _origSubmitText) {
       const span = submitBtn.querySelector('span');
@@ -1468,7 +1617,11 @@ function createTransactionRow(tx, index = 0) {
   const isPositive = deltaVal > 0;
   const deltaColor = tx.type === 'BASE' ? 'text-slate-500' : (isPositive ? 'text-emerald-700' : 'text-rose-700');
   const deltaSign = isPositive && tx.type !== 'BASE' ? '+' : '';
-  const reasonText = escapeHtml(tx.reason || tx.type || '');
+  let rawReason = tx.reason || tx.type || '';
+  if (isKawaiiMode) {
+    rawReason = cutifyLedgerReason(rawReason);
+  }
+  const reasonText = escapeHtml(rawReason);
   const dateText = escapeHtml(tx.date || '');
 
   row.innerHTML = `
@@ -1502,18 +1655,23 @@ function renderCourseCard(courseKey, data) {
   if (!data || !data.enrolled) {
     if (badge) {
       badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600 border border-slate-200 shrink-0';
-      badge.innerHTML = isJuicyMode
-        ? `<svg class="w-3 h-3 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg><span>Not Enrolled</span>`
-        : '<span>Not Enrolled</span>';
-      badge.title = 'Not enrolled in this course.';
+      const label = isKawaiiMode ? 'Not Enrolled nya... (T_T)' : 'Not Enrolled';
+      badge.innerHTML = (isJuicyMode || isKawaiiMode)
+        ? `<svg class="w-3 h-3 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg><span>${label}</span>`
+        : `<span>${label}</span>`;
+      badge.title = isKawaiiMode ? 'Not enrolled in this course ~desu.' : 'Not enrolled in this course.';
     }
 
-    if (notEnrolledEl) notEnrolledEl.classList.remove('hidden');
+    if (notEnrolledEl) {
+      notEnrolledEl.classList.remove('hidden');
+      const pBold = notEnrolledEl.querySelector('p.font-semibold');
+      if (pBold) pBold.textContent = isKawaiiMode ? 'Not Enrolled nya... (T_T)' : 'Not Enrolled';
+    }
     if (enrolledContentEl) enrolledContentEl.classList.add('hidden');
     if (ledgerSectionEl) ledgerSectionEl.classList.add('hidden');
 
     if (reasonEl && data?.reason) {
-      reasonEl.textContent = data.reason;
+      reasonEl.textContent = isKawaiiMode ? `${data.reason} ~desu.` : data.reason;
     }
     return;
   }
@@ -1527,9 +1685,33 @@ function renderCourseCard(courseKey, data) {
   const earned = data.earned || 0.0;
   const spent = data.spent || 0.0;
 
-  // Single unified status badge with crisp Lucide vector micro-SVGs (never wraps course title)
+  // Single unified status badge with crisp Lucide vector micro-SVGs
   if (badge) {
-    if (isJuicyMode) {
+    if (isKawaiiMode) {
+      if (balance >= 3.0) {
+        badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-pink-100 text-pink-800 border border-pink-300 shrink-0';
+        badge.innerHTML = `<svg class="w-3 h-3 text-pink-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>Stockpiler-nya! 👑</span>`;
+        badge.title = 'Vault reserve ≥ 3.0 tokens nya! Super prepared ~desu! (◕‿◕✿)';
+        if (cardEl) cardEl.classList.add(isGetxr ? 'aura-glow-gold' : 'aura-glow-indigo');
+      } else if (earned > 0.0) {
+        badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0';
+        badge.innerHTML = `<svg class="w-3 h-3 text-emerald-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg><span>Prepared-nya! 🌸</span>`;
+        badge.title = 'Attendance credits banked nya! Inventory bolstered ~desu!';
+        if (balance >= 2.5 && cardEl) {
+          cardEl.classList.add(isGetxr ? 'aura-glow-gold' : 'aura-glow-indigo');
+        }
+      } else if (spent > 0.0) {
+        badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-purple-50 text-purple-700 border border-purple-200 shrink-0';
+        badge.innerHTML = `<svg class="w-3 h-3 text-purple-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Extended-nya! ⏰</span>`;
+        badge.title = 'Late tokens deployed nya! Taking extra time ~desu!';
+      } else {
+        badge.className = isGetxr 
+          ? 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-medium bg-pink-50 text-pink-700 border border-pink-200 shrink-0'
+          : 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-medium bg-purple-50 text-purple-700 border border-purple-200 shrink-0';
+        badge.innerHTML = `<svg class="w-3 h-3 text-pink-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>Enrolled ~desu! ✨</span>`;
+        badge.title = 'Base tokens primed nya!';
+      }
+    } else if (isJuicyMode) {
       if (balance >= 3.0) {
         badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-800 border border-amber-300 shrink-0';
         badge.innerHTML = `<svg class="w-3 h-3 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>Stockpiler</span>`;
@@ -1560,6 +1742,27 @@ function renderCourseCard(courseKey, data) {
     }
   }
 
+  // Update card balance title and stats labels
+  if (cardEl) {
+    const availHeading = cardEl.querySelector('.bg-slate-50\\/80 span.text-\\[10px\\]');
+    if (availHeading) {
+      availHeading.textContent = isKawaiiMode ? 'Available Late Tokens ~desu 🐾' : 'Available Late Tokens';
+    }
+    const statCols = cardEl.querySelectorAll('.grid-cols-3 > div > span:first-child');
+    if (statCols && statCols.length === 3) {
+      statCols[0].textContent = isKawaiiMode ? 'Base ~desu' : 'Base';
+      statCols[1].textContent = isKawaiiMode ? 'Earned nya✨' : 'Earned';
+      statCols[2].textContent = isKawaiiMode ? 'Spent nya' : 'Spent';
+    }
+    const historyHeader = cardEl.querySelector('#' + prefix + 'LedgerSection h4');
+    if (historyHeader) {
+      const span1 = historyHeader.querySelector('span:first-child');
+      const span2 = historyHeader.querySelector('span:last-child');
+      if (span1) span1.textContent = isKawaiiMode ? 'Activity History-nya 📜' : 'Activity History';
+      if (span2) span2.textContent = isKawaiiMode ? '(Newest first ~desu)' : '(Newest first)';
+    }
+  }
+
   const balanceEl = document.getElementById(`${prefix}Balance`);
   animateCounter(balanceEl, balance);
 
@@ -1570,7 +1773,9 @@ function renderCourseCard(courseKey, data) {
   // Render transactions (reversed for newest first) with optional stagger
   const transactions = (data.transactions || []).slice().reverse();
   if (transactions.length === 0) {
-    ledger.innerHTML = '<div class="text-[11px] text-slate-500 py-1">No transaction history yet.</div>';
+    ledger.innerHTML = isKawaiiMode
+      ? '<div class="text-[11px] text-pink-600 py-1">No transaction history yet nya~ (・ω・)</div>'
+      : '<div class="text-[11px] text-slate-500 py-1">No transaction history yet.</div>';
   } else {
     transactions.forEach((tx, idx) => ledger.appendChild(createTransactionRow(tx, idx)));
   }
@@ -1622,7 +1827,9 @@ async function performLookup(rawId, updateUrl = true) {
   const resultsContainer = document.getElementById('resultsContainer');
 
   if (!rawId) {
-    showAlert('Please enter your student number (e.g. 1234567 or s1234567).');
+    showAlert(isKawaiiMode
+      ? 'Please enter your student number nya~ (e.g. s1234567) desu! (ฅ^•ﻌ•^ฅ)'
+      : 'Please enter your student number (e.g. 1234567 or s1234567).');
     inputEl.focus();
     return;
   }
@@ -1657,9 +1864,13 @@ async function performLookup(rawId, updateUrl = true) {
 
     if (!res.ok) {
       if (res.status === 404) {
-        throw new Error(`Student number "${studentId}" was not found in the course roster. Please double-check the number or contact your instructor.`);
+        throw new Error(isKawaiiMode
+          ? `Student number "${studentId}" was not found in the roster nya... (T_T) Please double-check or ask sensei ~desu!`
+          : `Student number "${studentId}" was not found in the course roster. Please double-check the number or contact your instructor.`);
       }
-      throw new Error(`Error loading record (${res.status}). Please try again.`);
+      throw new Error(isKawaiiMode
+        ? `Error loading record (${res.status}) nya... Please try again ~desu!`
+        : `Error loading record (${res.status}). Please try again.`);
     }
 
     const data = await res.json();
@@ -1680,7 +1891,7 @@ async function performLookup(rawId, updateUrl = true) {
       else if (!isJuicyMode) modeSuffix = '?vanilla';
       history.replaceState(null, '', window.location.pathname + '#' + studentId + modeSuffix);
     }
-    document.title = `IM 2026 Tokens — ${studentId}`;
+    document.title = isKawaiiMode ? `IM 2026 Tokens — ${studentId} ~desu ✨` : `IM 2026 Tokens — ${studentId}`;
 
     resultsContainer.classList.remove('hidden');
     if (window.innerWidth < 768) {
@@ -1691,11 +1902,11 @@ async function performLookup(rawId, updateUrl = true) {
   } catch (err) {
     currentStudentId = '';
     resultsContainer.classList.add('hidden');
-    document.title = 'IM 2026 Token Lookup';
+    document.title = isKawaiiMode ? 'IM 2026 Token Lookup ~desu! (✿◠‿◠)' : 'IM 2026 Token Lookup';
     const isNetworkError = err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError');
     const msg = isNetworkError 
-      ? 'Unable to connect to the server. Please check your internet connection and try again.'
-      : (err.message || 'An unexpected error occurred.');
+      ? (isKawaiiMode ? 'Cannot reach server-nya! Please check your internet connection desu (´-ω-｀)' : 'Unable to connect to the server. Please check your internet connection and try again.')
+      : (err.message || (isKawaiiMode ? 'An unexpected error occurred nya...' : 'An unexpected error occurred.'));
     showAlert(msg);
   } finally {
     submitBtn.disabled = false;
@@ -1896,13 +2107,19 @@ function _updateTelemetryUI() {
     container.className = count > 0
       ? 'inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-mono bg-slate-100 text-slate-700 border border-slate-300 transition-all select-none shadow-2xs cursor-pointer hover:bg-slate-200/70'
       : 'inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-mono bg-slate-100/90 text-slate-500 border border-slate-200 transition-all select-none shadow-2xs cursor-pointer hover:bg-slate-200/50';
+    const counterLabel = isKawaiiMode 
+      ? `Secrets discovered nya: ${count}/${total} ✨` 
+      : `Secrets discovered: ${count}/${total}`;
+    const counterTooltip = isKawaiiMode
+      ? `Secrets discovered nya: ${count}/${total} — Explore to find all ${total} ~desu! (Shift+click to reset)`
+      : `Secrets discovered: ${count}/${total} — Explore the page to find all ${total}! (Shift+click to reset)`;
     container.innerHTML = `
       <svg class="w-3.5 h-3.5 text-amber-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
       </svg>
-      <span id="eggCounterText">Secrets discovered: ${count}/${total}</span>
+      <span id="eggCounterText">${counterLabel}</span>
     `;
-    container.setAttribute('title', `Secrets discovered: ${count}/${total} — Explore the page to find all ${total}! (Shift+click to reset)`);
+    container.setAttribute('title', counterTooltip);
     container.onclick = (e) => {
       if (!isJuicyMode) return;
       if (e.shiftKey) {
@@ -3560,6 +3777,12 @@ function init3DVoidModule() {
 
   // Altitude Tiers & Dynamic Visuals
   function getAltitudeTier(y) {
+    if (isKawaiiMode) {
+      if (y < 500) return { tier: 0, name: 'Cotton Ground-nya 🌸' };
+      if (y < 2000) return { tier: 1, name: 'Candy Clouds ~desu ☁️' };
+      if (y < 5000) return { tier: 2, name: 'Pastel Sky nya~ ✨' };
+      return { tier: 3, name: 'Starry Dream ~desu 🌟' };
+    }
     if (y < 500) return { tier: 0, name: 'Ground Studio' };
     if (y < 2000) return { tier: 1, name: 'Troposphere' };
     if (y < 5000) return { tier: 2, name: 'Stratosphere' };
