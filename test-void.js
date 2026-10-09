@@ -6,9 +6,28 @@
 
 let appConfig = null;
 let isJuicyMode = true;
-let isSoundEnabled = false; // Always defaults to OFF on load/reload; never persisted
+let isSoundEnabled = false;
 let currentStudentId = '';
 let isKawaiiMode = false;
+let isInTheVoid = false;
+
+// Persisted sound preferences
+const _SOUND_KEY = 'im_tokens_sound_enabled';
+
+function getStoredSoundPreference() {
+  try {
+    const val = localStorage.getItem(_SOUND_KEY);
+    return val === '1' || val === 'true';
+  } catch (e) {
+    return false;
+  }
+}
+
+function storeSoundPreference(enabled) {
+  try {
+    localStorage.setItem(_SOUND_KEY, enabled ? '1' : '0');
+  } catch (e) {}
+}
 
 // ==========================================================================
 // Procedural Web Audio Synthesizer (Juicy Mode SFX — Zero External Assets)
@@ -1134,7 +1153,7 @@ function updateSoundUI() {
     soundBtn.className = isKawaiiMode
       ? 'text-xs px-2.5 py-1.5 rounded-full border border-pink-200 bg-white hover:bg-pink-50/60 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0'
       : 'text-xs px-2.5 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0';
-    soundBtn.setAttribute('title', isKawaiiMode ? 'Enable cute sounds ~desu! ✨' : 'Enable sound effects (resets on reload)');
+    soundBtn.setAttribute('title', isKawaiiMode ? 'Enable cute sounds ~desu! ✨' : 'Enable sound effects');
     if (soundIcon) {
       soundIcon.innerHTML = isKawaiiMode
         ? `<svg class="w-3.5 h-3.5 text-pink-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></svg>`
@@ -1147,7 +1166,12 @@ function updateSoundUI() {
   }
 }
 
-function setSoundEnabled(enabled, playFeedback = true) {
+function setSoundEnabled(enabled, playFeedback = true, persist = true) {
+  const target = Boolean(enabled);
+  if (persist) {
+    storeSoundPreference(target);
+  }
+
   if (!isJuicyMode) {
     isSoundEnabled = false;
     SoundEngine.stopVoidCharge(false);
@@ -1157,7 +1181,7 @@ function setSoundEnabled(enabled, playFeedback = true) {
   }
 
   const wasEnabled = isSoundEnabled;
-  isSoundEnabled = Boolean(enabled);
+  isSoundEnabled = target;
   updateSoundUI();
 
   if (isSoundEnabled) {
@@ -1419,6 +1443,14 @@ function setMode(modeOrJuicy, updateUrl = true) {
     isJuicyMode = false;
   }
 
+  // Restore stored sound preference when entering Juicy/Kawaii modes
+  if (isJuicyMode) {
+    isSoundEnabled = getStoredSoundPreference();
+    if (isSoundEnabled) {
+      SoundEngine.resumeCtx();
+    }
+  }
+
   try {
     localStorage.setItem('im_tokens_fx_mode', mode);
   } catch (e) {}
@@ -1478,13 +1510,12 @@ function setMode(modeOrJuicy, updateUrl = true) {
 
     // Telemetry & Fanfare
     if (!wasKawaii) {
-      if (!isSoundEnabled) {
-        isSoundEnabled = true;
-      }
       const { isNew, totalFound } = _unlockTelemetry('0xdm');
       const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
       _notifyTelemetry(`✨ Sparkles everywhere! Kawaii Mode unlocked nya! (｡♥‿♥｡) ~desu${suffix}`);
-      SoundEngine.playKawaiiFanfare();
+      if (isSoundEnabled) {
+        SoundEngine.playKawaiiFanfare();
+      }
     }
   } else if (isJuicyMode) {
     document.body.classList.add('juicy-mode');
@@ -1515,6 +1546,7 @@ function setMode(modeOrJuicy, updateUrl = true) {
       SoundEngine.playToggleOff();
     }
     isSoundEnabled = false;
+    SoundEngine.suspendCtx();
     document.body.classList.remove('juicy-mode');
     document.body.classList.remove('kawaii-mode');
     document.body.classList.add('vanilla-mode');
@@ -2286,7 +2318,9 @@ function _unlockTelemetry(tag) {
     try {
       localStorage.setItem(_K_STORE, JSON.stringify([...discovered]));
     } catch (e) {}
-    SoundEngine.playSecretUnlock(discovered.size === _0xM.length, 0.18);
+    if (tag !== '0xdm') {
+      SoundEngine.playSecretUnlock(discovered.size === _0xM.length, 0.18);
+    }
   }
 
   _updateTelemetryUI();
@@ -3258,7 +3292,7 @@ function init3DVoidModule() {
   let isHoldingKey = false;
   let holdStartTime = 0;
   let shakeRafId = null;
-  let isInTheVoid = false;
+  isInTheVoid = false;
 
   // First-person camera & world coordinates
   let camX = 0;
@@ -5006,8 +5040,8 @@ function triggerGravityMode() {
 
   // If in The Void, toggle 3D Void Gravity mode
   if (isInTheVoid) {
-    if (typeof toggleVoidGravityMode === 'function') {
-      toggleVoidGravityMode();
+    if (typeof window.toggleVoidGravityMode === 'function') {
+      window.toggleVoidGravityMode();
     }
     return;
   }
@@ -5200,11 +5234,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     'color: #4f46e5; font-weight: bold; font-size: 12px;'
   );
   
-  // Always force sound OFF on initial load and when returning via back/forward cache (pageshow)
-  setSoundEnabled(false, false);
+  // Restore sound preference from storage (persisted across reloads)
+  const savedSound = getStoredSoundPreference();
+  setSoundEnabled(savedSound, false, false);
   window.addEventListener('pageshow', () => {
-    setSoundEnabled(false, false);
+    const pref = getStoredSoundPreference();
+    setSoundEnabled(pref, false, false);
   });
+
+  // Ensure AudioContext is seamlessly resumed on first user gesture if sound is enabled
+  const unlockAudioOnGesture = () => {
+    if (isSoundEnabled) {
+      SoundEngine.resumeCtx();
+    }
+  };
+  window.addEventListener('pointerdown', unlockAudioOnGesture, { passive: true });
+  window.addEventListener('keydown', unlockAudioOnGesture, { passive: true });
 
   // Resolve initial mode preference from URL or storage
   const preferredJuicy = checkFxPreference();
