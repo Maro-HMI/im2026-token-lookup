@@ -1108,75 +1108,101 @@ const SoundEngine = (() => {
       playTone({ freqStart: 540 * norm, freqEnd: 320 * norm, type: 'triangle', duration: 0.11, gainPeak: 0.10 * norm, delay: 0.04, filterFreq: 2200 });
     },
 
-    // 19. Secret #14 (0xen) — "Under the C" Calypso Steel-Pan Jingle
+    // 19. Secret #14 (0xen) — "Under the C" Sheet Music Steel Drum Intro Riff (♩=200, Bb Major)
     playUnderTheSea() {
       if (!canPlay()) return;
-      const melody = [
-        // [delaySec, freqHz, durSec, gainPeak]
-        // Pickup: "Un-"
-        [0.00, 392.00, 0.12, 0.11], // G4
-        // "-der the sea!"
-        [0.14, 523.25, 0.14, 0.13], // C5
-        [0.28, 659.25, 0.16, 0.13], // E5
-        [0.46, 523.25, 0.26, 0.15], // C5
 
-        // Steel drum calypso fill
-        [0.74, 659.25, 0.10, 0.08], // E5
-        [0.86, 783.99, 0.12, 0.09], // G5
+      // Note frequencies (Bb Major key signature: Bb & Eb)
+      const Bb3 = 233.08;
+      const C4  = 261.63;
+      const D4  = 293.66;
+      const Eb4 = 311.13;
+      const F4  = 349.23;
+      const A4  = 440.00;
+      const Bb4 = 466.16;
+      const C5  = 523.25;
+      const D5  = 587.33;
+      const Eb5 = 622.25;
 
-        // "Un-der the sea!"
-        [1.02, 392.00, 0.12, 0.11], // G4
-        [1.16, 523.25, 0.14, 0.13], // C5
-        [1.30, 659.25, 0.16, 0.13], // E5
-        [1.48, 523.25, 0.28, 0.15], // C5
+      // Tempo: ♩ = 200 bpm -> quarter note = 0.30s, eighth note = 0.15s
+      const events = [
+        // === MEASURE 1 ===
+        // Beat 1: D4 (eighth)
+        { delay: 0.00, freq: D4, dur: 0.14, gain: 0.12 },
+        // Beat 1&: F4 (eighth)
+        { delay: 0.15, freq: F4, dur: 0.14, gain: 0.12 },
+        // Beat 2: Bb4 (eighth)
+        { delay: 0.30, freq: Bb4, dur: 0.14, gain: 0.13 },
+        // Beat 2&: [Bb4, D5] (eighth tied across beat 3 -> rings 0.28s)
+        { delay: 0.45, freq: Bb4, dur: 0.28, gain: 0.10 },
+        { delay: 0.45, freq: D5,  dur: 0.28, gain: 0.13 },
+        // Beat 3&: [Bb4, D5] (quarter note)
+        { delay: 0.75, freq: Bb4, dur: 0.27, gain: 0.10 },
+        { delay: 0.75, freq: D5,  dur: 0.27, gain: 0.13 },
+        // Beat 4&: F4 (eighth note pickup)
+        { delay: 1.05, freq: F4, dur: 0.14, gain: 0.12 },
 
-        // "Dar-ling it's bet-ter"
-        [1.82, 659.25, 0.11, 0.12], // E5
-        [1.95, 698.46, 0.11, 0.12], // F5
-        [2.08, 783.99, 0.12, 0.13], // G5
-        [2.22, 880.00, 0.14, 0.14], // A5
-        [2.38, 783.99, 0.12, 0.13], // G5
-        [2.52, 698.46, 0.12, 0.12], // F5
-        [2.66, 659.25, 0.16, 0.13], // E5
+        // === MEASURE 2 ===
+        // Beat 1: [A4, C5] (quarter note)
+        { delay: 1.20, freq: A4, dur: 0.27, gain: 0.10 },
+        { delay: 1.20, freq: C5, dur: 0.27, gain: 0.13 },
+        // Beat 2: [C5, Eb5] (quarter note)
+        { delay: 1.50, freq: C5,  dur: 0.27, gain: 0.10 },
+        { delay: 1.50, freq: Eb5, dur: 0.27, gain: 0.13 },
+        // Beat 3: [Bb4, D5] (quarter note)
+        { delay: 1.80, freq: Bb4, dur: 0.27, gain: 0.10 },
+        { delay: 1.80, freq: D5,  dur: 0.27, gain: 0.13 },
+        // Beat 4: [F4, Bb4] (quarter note)
+        { delay: 2.10, freq: F4,  dur: 0.27, gain: 0.10 },
+        { delay: 2.10, freq: Bb4, dur: 0.27, gain: 0.13 },
 
-        // "down where it's wet-ter"
-        [2.86, 587.33, 0.11, 0.12], // D5
-        [2.99, 659.25, 0.11, 0.12], // E5
-        [3.12, 698.46, 0.12, 0.13], // F5
-        [3.26, 783.99, 0.14, 0.14], // G5
-        [3.42, 698.46, 0.12, 0.13], // F5
-        [3.56, 659.25, 0.12, 0.12], // E5
-        [3.70, 587.33, 0.16, 0.13], // D5
+        // === MEASURE 3 ===
+        // Beat 1: Bb3 (eighth note)
+        { delay: 2.40, freq: Bb3, dur: 0.14, gain: 0.13 },
+        // Beat 1&: D4 (eighth note)
+        { delay: 2.55, freq: D4,  dur: 0.14, gain: 0.12 },
+        // Beat 2: F4 (eighth note)
+        { delay: 2.70, freq: F4,  dur: 0.14, gain: 0.12 },
+        // Beat 2&: [F4, Bb4] (eighth tied across beat 3 -> rings 0.28s)
+        { delay: 2.85, freq: F4,  dur: 0.28, gain: 0.10 },
+        { delay: 2.85, freq: Bb4, dur: 0.28, gain: 0.13 },
+        // Beat 3&: [F4, Bb4] (quarter note)
+        { delay: 3.15, freq: F4,  dur: 0.27, gain: 0.10 },
+        { delay: 3.15, freq: Bb4, dur: 0.27, gain: 0.13 },
+        // Beat 4&: C4 (eighth note pickup)
+        { delay: 3.45, freq: C4,  dur: 0.14, gain: 0.12 },
 
-        // "take it from me!"
-        [3.90, 523.25, 0.14, 0.13], // C5
-        [4.06, 587.33, 0.14, 0.13], // D5
-        [4.22, 659.25, 0.18, 0.14], // E5
-        // Final celebratory major chord with high shimmer
-        [4.44, 523.25, 0.45, 0.15], // C5
-        [4.44, 659.25, 0.45, 0.11], // E5
-        [4.44, 783.99, 0.45, 0.11], // G5
-        [4.44, 1046.50, 0.55, 0.12] // C6
+        // === MEASURE 4 ===
+        // Beat 1: [F4, A4] (quarter note)
+        { delay: 3.60, freq: F4, dur: 0.27, gain: 0.10 },
+        { delay: 3.60, freq: A4, dur: 0.27, gain: 0.13 },
+        // Beat 2: [Eb4, C5] (quarter note)
+        { delay: 3.90, freq: Eb4, dur: 0.27, gain: 0.10 },
+        { delay: 3.90, freq: C5,  dur: 0.27, gain: 0.13 },
+        // Beat 3: [D4, Bb4] (quarter note)
+        { delay: 4.20, freq: D4,  dur: 0.35, gain: 0.11 },
+        { delay: 4.20, freq: Bb4, dur: 0.35, gain: 0.14 }
+        // Beat 4: Quarter rest
       ];
 
-      melody.forEach(([d, f, dur, g]) => {
+      events.forEach(({ delay, freq, dur, gain }) => {
         // Steel pan fundamental body with subtle attack transient pitch-bend
         playTone({
-          freqStart: f * 1.035,
-          freqEnd: f,
+          freqStart: freq * 1.035,
+          freqEnd: freq,
           type: 'triangle',
           duration: dur,
-          gainPeak: g,
-          delay: d,
+          gainPeak: gain,
+          delay: delay,
           filterFreq: 3400
         });
         // Resonant harmonic overtone (gives the distinct steel drum pan ring)
         playTone({
-          freqStart: f * 2.0,
+          freqStart: freq * 2.0,
           type: 'sine',
           duration: dur * 0.65,
-          gainPeak: g * 0.42,
-          delay: d + 0.002,
+          gainPeak: gain * 0.40,
+          delay: delay + 0.002,
           filterFreq: 4600
         });
       });
