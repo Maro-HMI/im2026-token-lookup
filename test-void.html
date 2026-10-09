@@ -34,7 +34,7 @@
     <span>•</span>
     <span>Look: <span class="kbd-pill">Click + Drag</span></span>
     <span>•</span>
-    <span>Ascend: <span class="kbd-pill">Space</span> (Multi-Jump)</span>
+    <span>Jump: <span class="kbd-pill">Space</span></span>
     <span>•</span>
     <span>Sprint: <span class="kbd-pill">Shift</span></span>
   </div>
@@ -81,11 +81,21 @@
 
       <!-- 3D Troposphere Cloud Billboards (Altitudes: 900m – 2700m) -->
       <div id="voidCloudContainer">
-        <div class="void-cloud" style="transform: translate3d(-520px, -900px, -320px);"></div>
-        <div class="void-cloud" style="transform: translate3d(480px, -1350px, 240px);"></div>
-        <div class="void-cloud" style="transform: translate3d(-340px, -1800px, 480px);"></div>
-        <div class="void-cloud" style="transform: translate3d(580px, -2250px, -280px);"></div>
-        <div class="void-cloud" style="transform: translate3d(-80px, -2700px, 120px);"></div>
+        <div class="void-cloud-anchor" style="transform: translate3d(-520px, -900px, -320px);">
+          <div class="void-cloud"></div>
+        </div>
+        <div class="void-cloud-anchor" style="transform: translate3d(480px, -1350px, 240px);">
+          <div class="void-cloud"></div>
+        </div>
+        <div class="void-cloud-anchor" style="transform: translate3d(-340px, -1800px, 480px);">
+          <div class="void-cloud"></div>
+        </div>
+        <div class="void-cloud-anchor" style="transform: translate3d(580px, -2250px, -280px);">
+          <div class="void-cloud"></div>
+        </div>
+        <div class="void-cloud-anchor" style="transform: translate3d(-80px, -2700px, 120px);">
+          <div class="void-cloud"></div>
+        </div>
       </div>
 
       <!-- 3D Cosmic Guardian Cat in Orbit (Y ≈ 5500m) -->

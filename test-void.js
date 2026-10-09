@@ -966,22 +966,26 @@ function animateParticles() {
     p.y += p.vy;
     p.vy += p.gravity !== undefined ? p.gravity : 0.2;
     p.vx *= p.drag !== undefined ? p.drag : 0.98;
-    p.alpha -= p.decay;
-    p.rotation += p.rotSpeed;
+    p.alpha -= (p.decay !== undefined ? p.decay : 0.03);
+    p.rotSpeed = p.rotSpeed || 0;
+    p.rotation = (p.rotation || 0) + p.rotSpeed;
     if (p.tilt !== undefined) {
+      p.tiltSpeed = p.tiltSpeed || 0;
       p.tilt += p.tiltSpeed;
     }
 
-    if (p.alpha <= 0 || p.y > canvas.height + 60) {
+    if (isNaN(p.alpha) || isNaN(p.x) || isNaN(p.y) || p.alpha <= 0 || p.y > canvas.height + 60) {
       // Fast O(1) swap-and-pop removal avoids shifting remaining array elements
       particles[i] = particles[particles.length - 1];
       particles.pop();
       continue;
     }
 
+    const safeAlpha = Math.max(0, Math.min(1, p.alpha));
+
     if (p.shape === 'rect' || p.shape === 'ribbon') {
       ctx.save();
-      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.globalAlpha = safeAlpha;
       ctx.fillStyle = p.color;
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rotation);
@@ -991,7 +995,7 @@ function animateParticles() {
       ctx.restore();
     } else if (p.shape === 'diamond') {
       ctx.save();
-      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.globalAlpha = safeAlpha;
       ctx.fillStyle = p.color;
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rotation);
@@ -1005,7 +1009,7 @@ function animateParticles() {
       ctx.restore();
     } else {
       // Circles are rotationally invariant: draw directly without matrix transform overhead
-      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.globalAlpha = safeAlpha;
       ctx.fillStyle = p.color;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size / 2, 0, Math.PI * 2);
@@ -1511,9 +1515,13 @@ function _updateTelemetryUI() {
       </svg>
       <span id="eggCounterText">Secrets discovered: ${count}/${total}</span>
     `;
-    container.setAttribute('title', `Secrets discovered: ${count}/${total} — Explore the page to find all ${total}!`);
-    container.onclick = () => {
+    container.setAttribute('title', `Secrets discovered: ${count}/${total} — Explore the page to find all ${total}! (Shift+click to reset)`);
+    container.onclick = (e) => {
       if (!isJuicyMode) return;
+      if (e.shiftKey) {
+        _clearDiscoveredTelemetry();
+        return;
+      }
       container.classList.remove('badge-celebrate');
       void container.offsetWidth;
       container.classList.add('badge-celebrate');
@@ -1522,6 +1530,9 @@ function _updateTelemetryUI() {
     };
   }
 }
+
+// Expose dev/user helper to reset secrets
+window.resetSecrets = _clearDiscoveredTelemetry;
 
 // 1. Angular Maneuver Routine
 function _execManeuver() {
@@ -2349,6 +2360,7 @@ function init3DVoidModule() {
   const altimeterClimbArrow = document.getElementById('altimeterClimbArrow');
   const altimeterGaugeFill = document.getElementById('altimeterGaugeFill');
   const voidStarfield = document.getElementById('voidStarfield');
+  const voidCloudContainer = document.getElementById('voidCloudContainer');
   const cosmicCat3D = document.getElementById('cosmicCat3D');
   if (!worldRig) return;
 
@@ -2642,7 +2654,9 @@ function init3DVoidModule() {
       activeKeys[e.key] = true;
       if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') {
         e.preventDefault();
-        justPressedJump = true;
+        if (!e.repeat) {
+          justPressedJump = true;
+        }
       }
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
@@ -2774,6 +2788,14 @@ function init3DVoidModule() {
     if (floorShadow) floorShadow.style.opacity = '';
     if (voidStarfield) voidStarfield.style.opacity = '0';
     if (voidAltimeter) voidAltimeter.classList.remove('visible');
+    if (voidCloudContainer) {
+      voidCloudContainer.style.opacity = '0';
+      voidCloudContainer.style.display = 'none';
+    }
+
+    // Cleanly flush fx canvas and particle queue
+    particles.length = 0;
+    if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     SoundEngine.playVoidExit();
 
@@ -2895,37 +2917,26 @@ function init3DVoidModule() {
         camYaw += 2.2;
       }
 
-      // Jump & Atmospheric Flutter / Thruster Propulsion Physics
+      // Jump & Atmospheric Flutter Propulsion Physics
       const isGrounded = camY <= 0.01;
-      const wantsJump = Boolean(activeKeys['Space'] || activeKeys[' ']);
 
       if (isGrounded) {
-        if (justPressedJump || wantsJump) {
+        // Ground jump: requires a fresh Space press (holding space will never auto-rejump on touchdown)
+        if (justPressedJump) {
           justPressedJump = false;
-          camVy = isRunning ? 18.0 : 15.0;
+          camVy = isRunning ? 13.5 : 11.5;
           SoundEngine.playJump(isRunning);
         }
       } else {
-        // Mid-air: Support both Tap Impulse (Double-Jump / Multi-Jump) AND continuous Hold Thruster Flight
+        // Mid-air: Subtle flutter / multi-jump impulse on fresh Space press only (no hold-to-fly)
         if (justPressedJump) {
           justPressedJump = false;
-          // Punchy mid-air rocket boost
-          camVy = Math.max(camVy + 14.0, 19.0);
-          camVy = Math.min(camVy, 30.0);
+          camVy = Math.max(camVy + 6.5, 11.0);
+          camVy = Math.min(camVy, 16.0);
           
           const { tier } = getAltitudeTier(camY);
           SoundEngine.playThrusterJump(tier);
           spawnThrusterPuff();
-        } else if (wantsJump) {
-          // Continuous hold: jetpack thruster ascent
-          camVy = Math.min(camVy + 1.25, 26.0);
-          const now = performance.now();
-          if (now - lastThrusterPuffTime > 85) {
-            lastThrusterPuffTime = now;
-            const { tier } = getAltitudeTier(camY);
-            SoundEngine.playThrusterJump(tier);
-            spawnThrusterPuff();
-          }
         }
       }
 
@@ -3077,8 +3088,8 @@ function init3DVoidModule() {
           alpha: 1.0,
           decay: 0.02,
           shape: i % 2 === 0 ? 'diamond' : 'circle',
-          rotation: Math.random() * 360,
-          vRot: (Math.random() - 0.5) * 7
+          rotation: Math.random() * Math.PI * 2,
+          rotSpeed: (Math.random() - 0.5) * 0.18
         });
       }
       if (!animFrameId) animateParticles();
@@ -3147,6 +3158,23 @@ function init3DVoidModule() {
       voidStarfield.style.opacity = starOpacity.toFixed(3);
     }
 
+    // 4. Troposphere 3D Clouds (strictly hidden at ground level <= 600m)
+    if (voidCloudContainer) {
+      if (y <= 600) {
+        voidCloudContainer.style.opacity = '0';
+        voidCloudContainer.style.display = 'none';
+      } else if (y < 3200) {
+        voidCloudContainer.style.display = 'block';
+        const fadeIn = Math.min(1.0, (y - 600) / 600);
+        const fadeOut = y > 2400 ? Math.max(0, 1.0 - (y - 2400) / 800) : 1.0;
+        const cloudOpacity = Math.min(0.85, fadeIn * fadeOut);
+        voidCloudContainer.style.opacity = cloudOpacity.toFixed(3);
+      } else {
+        voidCloudContainer.style.opacity = '0';
+        voidCloudContainer.style.display = 'none';
+      }
+    }
+
     // 4. Update Altimeter Telemetry HUD
     if (voidAltimeter) {
       if (y > 140) {
@@ -3176,22 +3204,22 @@ function init3DVoidModule() {
     if (!canvas || !ctx || !isJuicyMode) return;
     const cx = window.innerWidth / 2;
     const cy = window.innerHeight * 0.78;
-    const puffColors = ['#38bdf8', '#7dd3fc', '#ffffff', '#fbbf24', '#f59e0b'];
-    for (let i = 0; i < 20; i++) {
-      const angle = Math.PI * 0.5 + (Math.random() - 0.5) * 1.2;
-      const speed = 4.5 + Math.random() * 7.0;
+    const puffColors = ['#38bdf8', '#7dd3fc', '#ffffff', '#fbbf24'];
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.PI * 0.5 + (Math.random() - 0.5) * 0.8;
+      const speed = 2.5 + Math.random() * 4.0;
       particles.push({
-        x: cx + (Math.random() - 0.5) * 70,
+        x: cx + (Math.random() - 0.5) * 30,
         y: cy,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        size: 3.0 + Math.random() * 4.5,
+        size: 2.0 + Math.random() * 2.5,
         color: puffColors[Math.floor(Math.random() * puffColors.length)],
-        alpha: 0.95,
-        decay: 0.038 + Math.random() * 0.024,
-        shape: Math.random() > 0.4 ? 'circle' : 'diamond',
-        rotation: Math.random() * 360,
-        vRot: (Math.random() - 0.5) * 6
+        alpha: 0.85,
+        decay: 0.05 + Math.random() * 0.03,
+        shape: 'circle',
+        rotation: 0,
+        rotSpeed: 0
       });
     }
     if (!animFrameId) animateParticles();
@@ -3216,7 +3244,7 @@ function init3DVoidModule() {
         decay: 0.05,
         shape: 'rect',
         rotation: 0,
-        vRot: 0
+        rotSpeed: 0
       });
     }
     if (!animFrameId) animateParticles();
@@ -3226,45 +3254,28 @@ function init3DVoidModule() {
     if (!canvas || !ctx || !isJuicyMode) return;
     const cx = window.innerWidth / 2;
     const cy = window.innerHeight * 0.72;
-    const colors = ['#f59e0b', '#fbbf24', '#ffffff', '#38bdf8', '#6366f1', '#a855f7'];
+    const colors = ['#f59e0b', '#fbbf24', '#ffffff', '#38bdf8', '#818cf8'];
 
-    // 1. High velocity spark burst blasting outward along the ground
-    for (let i = 0; i < 65; i++) {
-      const angle = (Math.random() > 0.5 ? 0 : Math.PI) + (Math.random() - 0.5) * 0.9;
-      const speed = 7.0 + Math.random() * 14.0;
+    // Crisp, fast-decaying sparks shooting outward along the ground (no lingering gray dust circles)
+    for (let i = 0; i < 20; i++) {
+      const angle = (Math.random() > 0.5 ? 0 : Math.PI) + (Math.random() - 0.5) * 0.8;
+      const speed = 6.0 + Math.random() * 9.0;
       particles.push({
         x: cx,
         y: cy,
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed * 0.25 - Math.random() * 3.0,
-        size: 3.5 + Math.random() * 5.0,
+        vy: Math.sin(angle) * speed * 0.2 - Math.random() * 2.0,
+        size: 2.5 + Math.random() * 3.0,
         color: colors[Math.floor(Math.random() * colors.length)],
         alpha: 1.0,
-        decay: 0.018 + Math.random() * 0.02,
+        decay: 0.045 + Math.random() * 0.025,
         shape: Math.random() > 0.5 ? 'diamond' : 'circle',
-        rotation: Math.random() * 360,
-        vRot: (Math.random() - 0.5) * 8
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.2
       });
     }
 
-    // 2. Rising dust / vapor clouds
-    for (let i = 0; i < 35; i++) {
-      particles.push({
-        x: cx + (Math.random() - 0.5) * 220,
-        y: cy,
-        vx: (Math.random() - 0.5) * 5.0,
-        vy: -2.5 - Math.random() * 5.0,
-        size: 6.0 + Math.random() * 7.0,
-        color: '#cbd5e1',
-        alpha: 0.7,
-        decay: 0.022,
-        shape: 'circle',
-        rotation: 0,
-        vRot: 0
-      });
-    }
-
-    // 3. Screen shake on viewport
+    // Screen shake on viewport
     const viewport = document.getElementById('appViewport');
     if (viewport) {
       viewport.classList.remove('superhero-shake');
