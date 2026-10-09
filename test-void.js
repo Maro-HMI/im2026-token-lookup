@@ -800,6 +800,77 @@ const SoundEngine = (() => {
         playNoiseBurst(0.18, 750, 'lowpass', 1.2, 0.14, 0);
         playTone({ freqStart: 380, freqEnd: 120, type: 'sawtooth', duration: 0.25, gainPeak: 0.10, filterFreq: 900 });
       }
+    },
+
+    // 17. Kawaii Mode (0xdm) — Magical Fanfare, Rubbery Boings & Cat Purrs
+    playKawaiiFanfare() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const notes = [1046.5, 1318.51, 1567.98, 1975.53, 2093.0]; // C6, E6, G6, B6, C7
+        notes.forEach((freq, idx) => {
+          playTone({
+            freqStart: freq,
+            freqEnd: freq * 1.02,
+            type: 'sine',
+            duration: 0.38,
+            gainPeak: 0.08,
+            delay: idx * 0.055,
+            filterFreq: 5500
+          });
+        });
+        playNoiseBurst(0.18, 3200, 'highpass', 2.0, 0.04, 0.12);
+      });
+    },
+
+    playKawaiiBoing() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(220, t0);
+        osc.frequency.exponentialRampToValueAtTime(640, t0 + 0.12);
+        osc.frequency.exponentialRampToValueAtTime(360, t0 + 0.22);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.001, t0);
+        gain.gain.linearRampToValueAtTime(0.18, t0 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.24);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.25);
+      });
+    },
+
+    playKawaiiPurr() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(68, t0);
+
+        const mod = ctx.createOscillator();
+        mod.frequency.setValueAtTime(24, t0);
+        const modGain = ctx.createGain();
+        modGain.gain.setValueAtTime(18, t0);
+        mod.connect(modGain);
+        modGain.connect(osc.frequency);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.001, t0);
+        gain.gain.linearRampToValueAtTime(0.12, t0 + 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.45);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        mod.start(t0);
+        osc.start(t0);
+        mod.stop(t0 + 0.46);
+        osc.stop(t0 + 0.46);
+      });
     }
   };
 })();
@@ -914,34 +985,61 @@ async function loadConfig() {
 // Mode Management (Juicy vs Vanilla)
 // ==========================================================================
 
+let isKawaiiMode = false;
+let _origHeroSubtitle = null;
+let _origPlaceholder = null;
+let _origSubmitText = null;
+
 function checkFxPreference() {
   const href = window.location.href.toLowerCase();
+  if (href.includes('kawaii') || href.includes('mode=kawaii')) {
+    return 'kawaii';
+  }
   // URL flag has highest precedence for bookmarks
   if (href.includes('vanilla') || href.includes('calm') || href.includes('plain') || href.includes('fx=0') || href.includes('no-fx')) {
-    return false;
+    return 'vanilla';
   }
   if (href.includes('juicy') || href.includes('fx=1')) {
-    return true;
+    return 'juicy';
   }
   // Local storage preference
   try {
     const stored = localStorage.getItem('im_tokens_fx_mode');
-    if (stored !== null) {
-      return stored === 'juicy';
+    if (stored === 'kawaii' || stored === 'juicy' || stored === 'vanilla') {
+      return stored;
     }
   } catch (e) {}
   // System prefers-reduced-motion
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    return false;
+    return 'vanilla';
   }
-  return true; // default
+  return 'juicy'; // default
 }
 
-function setMode(juicy, updateUrl = true) {
+function setMode(modeOrJuicy, updateUrl = true) {
+  let mode;
+  if (typeof modeOrJuicy === 'boolean') {
+    mode = modeOrJuicy ? 'juicy' : 'vanilla';
+  } else {
+    mode = modeOrJuicy || 'juicy';
+  }
+
   const wasJuicy = isJuicyMode;
-  isJuicyMode = juicy;
+  const wasKawaii = isKawaiiMode;
+
+  if (mode === 'kawaii') {
+    isKawaiiMode = true;
+    isJuicyMode = true;
+  } else if (mode === 'juicy') {
+    isKawaiiMode = false;
+    isJuicyMode = true;
+  } else {
+    isKawaiiMode = false;
+    isJuicyMode = false;
+  }
+
   try {
-    localStorage.setItem('im_tokens_fx_mode', juicy ? 'juicy' : 'vanilla');
+    localStorage.setItem('im_tokens_fx_mode', mode);
   } catch (e) {}
 
   const toggleBtn = document.getElementById('modeToggleBtn');
@@ -955,27 +1053,84 @@ function setMode(juicy, updateUrl = true) {
   const cardGetxr = document.getElementById('cardGetxr');
   const card3dma = document.getElementById('card3dma');
 
-  if (juicy) {
+  // Microcopy elements
+  const heroSub = document.querySelector('#mainContainer p.text-slate-500');
+  const studentInput = document.getElementById('studentIdInput');
+  const submitBtn = document.getElementById('submitBtn');
+
+  if (heroSub && !_origHeroSubtitle) _origHeroSubtitle = heroSub.textContent;
+  if (studentInput && !_origPlaceholder) _origPlaceholder = studentInput.placeholder;
+  if (submitBtn && !_origSubmitText) {
+    const span = submitBtn.querySelector('span');
+    if (span) _origSubmitText = span.textContent;
+  }
+
+  if (isKawaiiMode) {
     document.body.classList.add('juicy-mode');
+    document.body.classList.add('kawaii-mode');
+    document.body.classList.remove('vanilla-mode');
+
+    if (modeIcon) {
+      modeIcon.innerHTML = `<span class="text-xs shrink-0 select-none">🌸</span>`;
+    }
+    if (modeLabel) modeLabel.textContent = '✨ Kawaii';
+    if (toggleBtn) {
+      toggleBtn.setAttribute('title', '✨ Kawaii Mode Active! (Click to switch to Vanilla)');
+      spawnBurstAtElement(toggleBtn, ['#fbcfe8', '#f472b6', '#fda4af', '#fce7f3', '#ffffff'], 'sakura', 24);
+    }
+
+    if (ticket) ticket.setAttribute('title', 'Inspect golden ticket (◕‿◕✿)');
+    if (getxrLogo) getxrLogo.setAttribute('title', 'Inspect GETXR (* ^ ω ^)');
+    if (threedmaLogo) threedmaLogo.setAttribute('title', 'Inspect 3DMA (o˘◡˘o)');
+    if (getxrBal) getxrBal.setAttribute('title', 'Click to flip token! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧');
+    if (threedmaBal) threedmaBal.setAttribute('title', 'Click to flip token! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧');
+
+    // Kaomoji microcopy
+    if (heroSub) heroSub.textContent = 'Check your late tokens, Wooclap credits & extension stars! (◕‿◕✿)';
+    if (studentInput) studentInput.placeholder = 'e.g. s1234567 (ฅ^•ﻌ•^ฅ)';
+    if (submitBtn) {
+      const span = submitBtn.querySelector('span');
+      if (span) span.textContent = 'Lookup (•̀ᴗ•́)و';
+    }
+
+    // Telemetry & Fanfare
+    if (!wasKawaii) {
+      const { isNew, totalFound } = _unlockTelemetry('0xdm');
+      const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
+      _notifyTelemetry(`✨ Sparkles everywhere! Kawaii Mode unlocked! (｡♥‿♥｡)${suffix}`);
+      SoundEngine.playKawaiiFanfare();
+    }
+  } else if (isJuicyMode) {
+    document.body.classList.add('juicy-mode');
+    document.body.classList.remove('kawaii-mode');
     document.body.classList.remove('vanilla-mode');
     if (modeIcon) {
       modeIcon.innerHTML = `<svg class="w-3.5 h-3.5 text-amber-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>`;
     }
     if (modeLabel) modeLabel.textContent = 'Juicy';
-    if (toggleBtn) toggleBtn.setAttribute('title', 'Switch to Vanilla mode (calm, instant)');
+    if (toggleBtn) toggleBtn.setAttribute('title', 'Switch to Kawaii mode (pastel dreamscape)');
     if (ticket) ticket.setAttribute('title', 'Inspect golden ticket');
     if (getxrLogo) getxrLogo.setAttribute('title', 'Inspect asset');
     if (threedmaLogo) threedmaLogo.setAttribute('title', 'Inspect asset');
     if (getxrBal) getxrBal.setAttribute('title', 'Click to flip token!');
     if (threedmaBal) threedmaBal.setAttribute('title', 'Click to flip token!');
+
+    // Restore original microcopy
+    if (heroSub && _origHeroSubtitle) heroSub.textContent = _origHeroSubtitle;
+    if (studentInput && _origPlaceholder) studentInput.placeholder = _origPlaceholder;
+    if (submitBtn && _origSubmitText) {
+      const span = submitBtn.querySelector('span');
+      if (span) span.textContent = _origSubmitText;
+    }
   } else {
-    // Switching to Vanilla forces sound off (with soft power-down thud if sound was active)
+    // Vanilla
     if (wasJuicy && isSoundEnabled) {
       SoundEngine.stopVoidCharge(false);
       SoundEngine.playToggleOff();
     }
     isSoundEnabled = false;
     document.body.classList.remove('juicy-mode');
+    document.body.classList.remove('kawaii-mode');
     document.body.classList.add('vanilla-mode');
     if (modeIcon) {
       modeIcon.innerHTML = `<svg class="w-3.5 h-3.5 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 7 18 0"/><path d="m3 17 18 0"/><path d="m17 5 0 4"/><path d="m7 15 0 4"/></svg>`;
@@ -995,6 +1150,14 @@ function setMode(juicy, updateUrl = true) {
       card3dma.style.transform = '';
       card3dma.classList.remove('tilt-card-reset');
     }
+
+    // Restore original microcopy
+    if (heroSub && _origHeroSubtitle) heroSub.textContent = _origHeroSubtitle;
+    if (studentInput && _origPlaceholder) studentInput.placeholder = _origPlaceholder;
+    if (submitBtn && _origSubmitText) {
+      const span = submitBtn.querySelector('span');
+      if (span) span.textContent = _origSubmitText;
+    }
   }
 
   // Update sound toggle button visibility & state
@@ -1005,8 +1168,10 @@ function setMode(juicy, updateUrl = true) {
 
   // Preserve mode in URL hash if student record is visible
   if (updateUrl && currentStudentId) {
-    const hashStr = isJuicyMode ? currentStudentId : `${currentStudentId}?vanilla`;
-    history.replaceState(null, '', window.location.pathname + '#' + hashStr);
+    let modeSuffix = '';
+    if (isKawaiiMode) modeSuffix = '?kawaii';
+    else if (!isJuicyMode) modeSuffix = '?vanilla';
+    history.replaceState(null, '', window.location.pathname + '#' + currentStudentId + modeSuffix);
   }
 }
 
@@ -1128,6 +1293,31 @@ function animateParticles() {
       ctx.closePath();
       ctx.fill();
       ctx.restore();
+    } else if (p.shape === 'sakura') {
+      ctx.save();
+      ctx.globalAlpha = safeAlpha;
+      ctx.fillStyle = p.color;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation);
+      ctx.beginPath();
+      ctx.moveTo(0, -p.size);
+      ctx.bezierCurveTo(p.size * 0.85, -p.size * 0.85, p.size * 0.85, p.size * 0.6, 0, p.size);
+      ctx.bezierCurveTo(-p.size * 0.85, p.size * 0.6, -p.size * 0.85, -p.size * 0.85, 0, -p.size);
+      ctx.fill();
+      ctx.restore();
+    } else if (p.shape === 'heart') {
+      ctx.save();
+      ctx.globalAlpha = safeAlpha;
+      ctx.fillStyle = p.color;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation);
+      const d = p.size * 0.65;
+      ctx.beginPath();
+      ctx.moveTo(0, d * 0.3);
+      ctx.bezierCurveTo(-d, -d * 0.6, -d * 1.5, d * 0.6, 0, d * 1.4);
+      ctx.bezierCurveTo(d * 1.5, d * 0.6, d, -d * 0.6, 0, d * 0.3);
+      ctx.fill();
+      ctx.restore();
     } else {
       // Circles are rotationally invariant: draw directly without matrix transform overhead
       ctx.globalAlpha = safeAlpha;
@@ -1138,7 +1328,55 @@ function animateParticles() {
     }
   }
 
+  // Ambient gentle sakura & heart drift in Kawaii Mode
+  if (isKawaiiMode && canvas) {
+    if (particles.length < 28 && Math.random() < 0.14) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: -15,
+        vx: (Math.random() - 0.4) * 1.2,
+        vy: 0.8 + Math.random() * 1.2,
+        size: 5 + Math.random() * 6,
+        color: ['#fbcfe8', '#f472b6', '#fda4af', '#fce7f3', '#ffffff'][Math.floor(Math.random() * 5)],
+        alpha: 0.85,
+        decay: 0.003,
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.035,
+        shape: Math.random() > 0.3 ? 'sakura' : 'heart',
+        gravity: 0.015,
+        drag: 0.99
+      });
+    }
+  }
+
   animFrameId = requestAnimationFrame(animateParticles);
+}
+
+function spawnKawaiiHeartPuff() {
+  if (!canvas || !ctx || !isJuicyMode) return;
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight * 0.76;
+  const colors = ['#f472b6', '#ec4899', '#fbcfe8', '#ffffff', '#c084fc'];
+  for (let i = 0; i < 9; i++) {
+    const angle = Math.PI * 0.5 + (Math.random() - 0.5) * 0.9;
+    const speed = 2.5 + Math.random() * 4.5;
+    particles.push({
+      x: cx + (Math.random() - 0.5) * 60,
+      y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed * 0.5 - 2.5,
+      size: 4 + Math.random() * 4,
+      color: colors[i % colors.length],
+      alpha: 1.0,
+      decay: 0.025,
+      rotation: Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random() - 0.5) * 0.15,
+      shape: 'heart',
+      gravity: 0.08,
+      drag: 0.98
+    });
+  }
+  if (!animFrameId) animateParticles();
 }
 
 // ==========================================================================
@@ -1488,6 +1726,14 @@ function handleFormSubmit(e) {
     return;
   }
 
+  // Kawaii Mode trigger (matches 'kawaii', 'uwu', 'nya')
+  if (lower === 'kawaii' || lower === 'uwu' || lower === 'nya') {
+    inputEl.value = '';
+    inputEl.blur();
+    setMode('kawaii', true);
+    return;
+  }
+
   performLookup(rawId, true);
 }
 
@@ -1512,7 +1758,7 @@ function handleClearSearch() {
 
 const _K_STORE = atob('aW1fdG9rZW5zX2Rpc2NvdmVyZWRfZWdncw==');
 
-// Subsystem telemetry manifest (12 secrets)
+// Subsystem telemetry manifest (13 secrets)
 const _0xM = [
   { id: '0x1a', name: atob('VG9rZW4gQ29pbiBGbGlw') },       // Token Coin Flip
   { id: '0x2b', name: atob('RG8gYSBCYXJyZWwgUm9sbA==') },   // Do a Barrel Roll
@@ -1525,7 +1771,8 @@ const _0xM = [
   { id: '0x9i', name: atob('VG9rZW4gT3ZlcmNsb2Nr') },      // Token Overclock
   { id: '0xaj', name: atob('R3VhcmRpYW4ncyBCbGVzc2luZw==') }, // Guardian's Blessing
   { id: '0xbk', name: atob('T3JiaXRhbCBBc2NlbnQ=') },       // Orbital Ascent
-  { id: '0xcl', name: atob('R3Jhdml0eSBNb2Rl') }            // Gravity Mode
+  { id: '0xcl', name: atob('R3Jhdml0eSBNb2Rl') },           // Gravity Mode
+  { id: '0xdm', name: atob('S2F3YWlpIE1vZGU=') }            // Kawaii Mode
 ];
 
 function _getDiscoveredTelemetry() {
@@ -2020,12 +2267,18 @@ function _setupFlipListener() {
       }, 700);
 
       const isGetxr = id.startsWith('getxr');
-      SoundEngine.playCoinFlip(isGetxr);
+      if (isKawaiiMode) {
+        SoundEngine.playKawaiiBoing();
+      } else {
+        SoundEngine.playCoinFlip(isGetxr);
+      }
 
-      const colors = isGetxr 
-        ? ['#f59e0b', '#fbbf24', '#fde047', '#eab308'] 
-        : ['#818cf8', '#a855f7', '#c084fc', '#6366f1'];
-      const shape = isGetxr ? 'circle' : 'diamond';
+      const colors = isKawaiiMode
+        ? ['#f472b6', '#ec4899', '#fbcfe8', '#fda4af', '#ffffff']
+        : (isGetxr 
+          ? ['#f59e0b', '#fbbf24', '#fde047', '#eab308'] 
+          : ['#818cf8', '#a855f7', '#c084fc', '#6366f1']);
+      const shape = isKawaiiMode ? (Math.random() > 0.5 ? 'heart' : 'sakura') : (isGetxr ? 'circle' : 'diamond');
       spawnBurstAtElement(el, colors, shape, 14);
 
       const { isNew, totalFound } = _unlockTelemetry('0x1a');
@@ -2437,6 +2690,9 @@ function setupCardTilt() {
     card.addEventListener('mouseenter', () => {
       if (!isJuicyMode || window.innerWidth < 768) return;
       updateRect();
+      if (isKawaiiMode) {
+        SoundEngine.playKawaiiPurr();
+      }
     });
 
     card.addEventListener('mousemove', (e) => {
@@ -2777,6 +3033,8 @@ function init3DVoidModule() {
     }
   }
 
+  let _kawaiiKeyBuffer = '';
+
   // Window key listeners for hold trigger
   window.addEventListener('keydown', (e) => {
     if (isInTheVoid) {
@@ -2811,6 +3069,16 @@ function init3DVoidModule() {
     }
 
     if (isInputFocused()) return; // Never trigger while typing in student number or using buttons
+
+    // Kawaii Mode keyword trigger outside inputs ('kawaii', 'uwu', 'nya')
+    if (e.key && e.key.length === 1) {
+      _kawaiiKeyBuffer = (_kawaiiKeyBuffer + e.key.toLowerCase()).slice(-10);
+      if (_kawaiiKeyBuffer.endsWith('kawaii') || _kawaiiKeyBuffer.endsWith('uwu') || _kawaiiKeyBuffer.endsWith('nya')) {
+        _kawaiiKeyBuffer = '';
+        setMode(isKawaiiMode ? 'juicy' : 'kawaii', true);
+        return;
+      }
+    }
     if (isGravityModeActive) return; // Do not trigger void hold while in gravity mode
     if (e.key === 'g' || e.key === 'G') {
       e.preventDefault();
@@ -3087,7 +3355,12 @@ function init3DVoidModule() {
         if (justPressedJump) {
           justPressedJump = false;
           camVy = isRunning ? 13.5 : 11.5;
-          SoundEngine.playJump(isRunning);
+          if (isKawaiiMode) {
+            SoundEngine.playKawaiiBoing();
+            spawnKawaiiHeartPuff();
+          } else {
+            SoundEngine.playJump(isRunning);
+          }
         }
       } else {
         // Mid-air: Subtle flutter / multi-jump impulse on fresh Space press only (no hold-to-fly)
@@ -3096,9 +3369,14 @@ function init3DVoidModule() {
           camVy = Math.max(camVy + 6.5, 11.0);
           camVy = Math.min(camVy, 16.0);
           
-          const { tier } = getAltitudeTier(camY);
-          SoundEngine.playThrusterJump(tier);
-          spawnThrusterPuff();
+          if (isKawaiiMode) {
+            SoundEngine.playKawaiiBoing();
+            spawnKawaiiHeartPuff();
+          } else {
+            const { tier } = getAltitudeTier(camY);
+            SoundEngine.playThrusterJump(tier);
+            spawnThrusterPuff();
+          }
         }
       }
 
@@ -4406,9 +4684,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleBtn = document.getElementById('modeToggleBtn');
   if (toggleBtn) {
     toggleBtn.addEventListener('click', () => {
-      setMode(!isJuicyMode, true);
+      let nextMode;
+      if (!isJuicyMode) {
+        nextMode = 'juicy';
+      } else if (!isKawaiiMode) {
+        nextMode = 'kawaii';
+      } else {
+        nextMode = 'vanilla';
+      }
+      setMode(nextMode, true);
       // If results are currently showing, re-render cards to reflect mode styles
-      const inputEl = document.getElementById('studentIdInput');
       if (currentStudentId && !document.getElementById('resultsContainer').classList.contains('hidden')) {
         performLookup(currentStudentId, false);
       }

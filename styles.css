@@ -1508,5 +1508,155 @@ body.in-the-void #cosmicCat3D.claimed .cosmic-cat-helmet {
   pointer-events: none;
 }
 
+/* ==========================================================================
+   Kawaii Mode (カワイイ モード) — Secret #13 (0xdm)
+   ========================================================================== */
+
+body.kawaii-mode {
+  background: radial-gradient(circle at 50% 0%, #fdf2f8 0%, #f5f3ff 45%, #f0fdf4 100%) fixed !important;
+  color: #4c1d95 !important;
+}
+
+body.kawaii-mode ::selection {
+  background: #fbcfe8 !important;
+  color: #831843 !important;
+}
+
+/* Extra pillowy cards with soft pink aura shadows */
+body.kawaii-mode #pageFront,
+body.kawaii-mode #cardGetxr,
+body.kawaii-mode #card3dma,
+body.kawaii-mode .search-input-wrap,
+body.kawaii-mode .altimeter-card {
+  border-radius: 1.5rem !important;
+  border-color: #fbcfe8 !important;
+  box-shadow: 0 16px 36px -6px rgba(244, 114, 182, 0.22), 0 0 0 1px rgba(244, 114, 182, 0.2) !important;
+}
+
+/* Navigation bar */
+body.kawaii-mode header {
+  border-color: #fce7f3 !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* Cat Ears on Course Cards */
+body.kawaii-mode #cardGetxr,
+body.kawaii-mode #card3dma {
+  position: relative !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.kawaii-mode #cardGetxr::before,
+body.kawaii-mode #card3dma::before {
+  content: '';
+  position: absolute;
+  top: -14px;
+  left: 28px;
+  width: 0;
+  height: 0;
+  border-left: 13px solid transparent;
+  border-right: 13px solid transparent;
+  border-bottom: 17px solid #f472b6;
+  transform-origin: bottom center;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 2px 4px rgba(244, 114, 182, 0.35));
+  z-index: 10;
+  pointer-events: none;
+}
+
+body.kawaii-mode #cardGetxr::after,
+body.kawaii-mode #card3dma::after {
+  content: '';
+  position: absolute;
+  top: -14px;
+  right: 28px;
+  width: 0;
+  height: 0;
+  border-left: 13px solid transparent;
+  border-right: 13px solid transparent;
+  border-bottom: 17px solid #f472b6;
+  transform-origin: bottom center;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 2px 4px rgba(244, 114, 182, 0.35));
+  z-index: 10;
+  pointer-events: none;
+}
+
+body.kawaii-mode #cardGetxr:hover::before,
+body.kawaii-mode #card3dma:hover::before {
+  transform: rotate(-14deg) scale(1.18);
+}
+
+body.kawaii-mode #cardGetxr:hover::after,
+body.kawaii-mode #card3dma:hover::after {
+  transform: rotate(14deg) scale(1.18);
+}
+
+/* Blushing icons and animated cheek glow */
+body.kawaii-mode #getxrLogo,
+body.kawaii-mode #threedmaLogo {
+  filter: drop-shadow(0 0 10px rgba(244, 114, 182, 0.6));
+  animation: kawaiiCheekGlow 2.5s ease-in-out infinite alternate;
+}
+
+@keyframes kawaiiCheekGlow {
+  0% { transform: scale(1); filter: drop-shadow(0 0 6px rgba(244, 114, 182, 0.4)); }
+  100% { transform: scale(1.06); filter: drop-shadow(0 0 14px rgba(244, 114, 182, 0.85)); }
+}
+
+/* Pastel Tokens Display Box */
+body.kawaii-mode .bg-slate-50\/80 {
+  background: rgba(253, 242, 248, 0.85) !important;
+  border-color: #fbcfe8 !important;
+}
+
+body.kawaii-mode #getxrBalance,
+body.kawaii-mode #threedmaBalance {
+  color: #db2777 !important;
+  text-shadow: 0 0 14px rgba(244, 114, 182, 0.4);
+}
+
+/* Mode Button Glow */
+body.kawaii-mode #modeToggleBtn {
+  border-color: #f472b6 !important;
+  background: #fdf2f8 !important;
+  box-shadow: 0 0 14px rgba(244, 114, 182, 0.5) !important;
+  color: #db2777 !important;
+}
+
+/* Search Submit Button */
+body.kawaii-mode #submitBtn {
+  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%) !important;
+  box-shadow: 0 4px 14px rgba(236, 72, 153, 0.4) !important;
+}
+body.kawaii-mode #submitBtn:hover {
+  background: linear-gradient(135deg, #f472b6 0%, #ec4899 100%) !important;
+  box-shadow: 0 6px 20px rgba(236, 72, 153, 0.55) !important;
+}
+
+/* Kawaii 3D Void Crossover: The Candy Cloud Dimension */
+body.kawaii-mode.in-the-void #voidFloor {
+  background-image: 
+    linear-gradient(to right, rgba(244, 114, 182, 0.45) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(167, 139, 250, 0.45) 1px, transparent 1px) !important;
+  box-shadow: inset 0 0 160px rgba(244, 114, 182, 0.35);
+}
+
+body.kawaii-mode.in-the-void #floorShadow {
+  background: radial-gradient(ellipse at center, rgba(244, 114, 182, 0.4) 0%, rgba(192, 132, 252, 0.18) 40%, transparent 70%) !important;
+}
+
+body.kawaii-mode.in-the-void .cloud-puff {
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #fce7f3 45%, #ede9fe 100%) !important;
+  box-shadow: 0 0 25px rgba(244, 114, 182, 0.35) !important;
+}
+
+body.kawaii-mode.in-the-void #easterEgg3D .egg-mesh {
+  background: radial-gradient(circle at 35% 25%, #ffffff 0%, #f472b6 40%, #db2777 85%, #9d174d 100%) !important;
+  box-shadow: 0 0 35px rgba(244, 114, 182, 0.85), 0 0 70px rgba(236, 72, 153, 0.45) !important;
+}
+
+
 
 
