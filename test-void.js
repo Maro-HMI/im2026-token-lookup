@@ -3281,20 +3281,36 @@ function init3DVoidModule() {
       voidStarfield.style.opacity = starOpacity.toFixed(3);
     }
 
-    // 4. Troposphere 3D Clouds (strictly hidden at ground level <= 600m)
+    // 4. Troposphere 3D Clouds (smooth S-curve fade-in from ground, full in troposphere, smooth cosine fade-out into stratosphere)
     if (voidCloudContainer) {
-      if (y <= 600) {
-        voidCloudContainer.style.opacity = '0';
-        voidCloudContainer.style.display = 'none';
-      } else if (y < 3200) {
-        voidCloudContainer.style.display = 'block';
-        const fadeIn = Math.min(1.0, (y - 600) / 600);
-        const fadeOut = y > 2400 ? Math.max(0, 1.0 - (y - 2400) / 800) : 1.0;
-        const cloudOpacity = Math.min(0.85, fadeIn * fadeOut);
-        voidCloudContainer.style.opacity = cloudOpacity.toFixed(3);
+      let cloudOpacity = 0;
+
+      if (y <= 550) {
+        // Ground studio: strictly 0 opacity and hidden so flat page is pristine
+        cloudOpacity = 0;
+      } else if (y < 1100) {
+        // Ascending into troposphere: smooth S-curve fade-in
+        const tIn = (y - 550) / 550;
+        const smoothIn = 0.5 * (1 - Math.cos(tIn * Math.PI));
+        cloudOpacity = 0.85 * smoothIn;
+      } else if (y <= 3000) {
+        // Cruising through the troposphere cloud bank
+        cloudOpacity = 0.85;
+      } else if (y < 4800) {
+        // Ascending through stratosphere towards orbit: smooth S-curve fade-out
+        const tOut = (y - 3000) / 1800;
+        const smoothOut = 0.5 * (1 + Math.cos(tOut * Math.PI));
+        cloudOpacity = 0.85 * smoothOut;
       } else {
+        cloudOpacity = 0;
+      }
+
+      if (cloudOpacity <= 0.002) {
         voidCloudContainer.style.opacity = '0';
         voidCloudContainer.style.display = 'none';
+      } else {
+        voidCloudContainer.style.display = 'block';
+        voidCloudContainer.style.opacity = cloudOpacity.toFixed(3);
       }
     }
 

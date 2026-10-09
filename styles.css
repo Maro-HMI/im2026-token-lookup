@@ -954,7 +954,6 @@ body.in-the-void #voidStarfield {
   display: none;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.5s ease;
 }
 
 body.in-the-void #voidCloudContainer {
@@ -962,6 +961,8 @@ body.in-the-void #voidCloudContainer {
   transform-style: preserve-3d;
   pointer-events: none;
   opacity: 0;
+  transition: none;
+  will-change: opacity;
 }
 
 .void-cloud-anchor {
