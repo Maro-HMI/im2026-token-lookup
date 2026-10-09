@@ -30,9 +30,31 @@
 
   <!-- Fixed 3D Void HUD Overlay (Visible only in 3D Void) -->
   <div id="voidControlsGuide">
-    <span>Walk: <span class="kbd-pill">W A S D</span> or <span class="kbd-pill">Arrows</span></span>
+    <span>Walk: <span class="kbd-pill">W A S D</span> / <span class="kbd-pill">Arrows</span></span>
     <span>•</span>
     <span>Look: <span class="kbd-pill">Click + Drag</span></span>
+    <span>•</span>
+    <span>Jump: <span class="kbd-pill">Space</span></span>
+    <span>•</span>
+    <span>Sprint: <span class="kbd-pill">Shift</span></span>
+  </div>
+
+  <!-- Atmospheric Ascent Altimeter HUD (Upper Left) -->
+  <div id="voidAltimeter">
+    <div class="altimeter-card">
+      <div class="altimeter-header">
+        <span id="altimeterZone" class="altimeter-zone-badge">Ground Studio</span>
+        <span id="altimeterClimbArrow" class="altimeter-climb-arrow">▲</span>
+      </div>
+      <div class="altimeter-readout">
+        <span class="altimeter-label">ALT</span>
+        <span id="altimeterValue" class="altimeter-value">0</span>
+        <span class="altimeter-unit">m</span>
+      </div>
+      <div class="altimeter-gauge-track">
+        <div id="altimeterGaugeFill" class="altimeter-gauge-fill"></div>
+      </div>
+    </div>
   </div>
 
   <div id="voidHud">
@@ -48,11 +70,115 @@
 
   <!-- Viewport & 3D World Rig -->
   <div id="appViewport">
+    <!-- Starfield Layer (Space Altitudes) -->
+    <div id="voidStarfield"></div>
+
     <div id="worldRig">
 
       <!-- Floor Grid & Contact Shadow (in 3D world) -->
       <div id="voidFloor"></div>
       <div id="floorShadow"></div>
+
+      <!-- 3D Physics Slabs Container for Gravity Mode -->
+      <div id="voidPhysicsContainer"></div>
+
+      <!-- 3D Troposphere Cloud Billboards (Altitudes: 900m – 3000m) -->
+      <div id="voidCloudContainer">
+        <!-- Cloud 1: Low Troposphere entrance (Y ≈ 950m) -->
+        <div class="void-cloud-anchor" style="transform: translate3d(-480px, -950px, -300px);">
+          <div class="void-cloud cloud-size-md" style="--drift-dur: 15s; --drift-delay: 0s;">
+            <div class="cloud-puff puff-base"></div>
+            <div class="cloud-puff puff-left"></div>
+            <div class="cloud-puff puff-center"></div>
+            <div class="cloud-puff puff-right"></div>
+            <div class="cloud-puff puff-crest"></div>
+          </div>
+        </div>
+
+        <!-- Cloud 2: Fluffy front bank (Y ≈ 1300m) -->
+        <div class="void-cloud-anchor" style="transform: translate3d(450px, -1300px, 220px);">
+          <div class="void-cloud cloud-size-lg" style="--drift-dur: 18s; --drift-delay: -3s;">
+            <div class="cloud-puff puff-base"></div>
+            <div class="cloud-puff puff-left"></div>
+            <div class="cloud-puff puff-center"></div>
+            <div class="cloud-puff puff-right"></div>
+            <div class="cloud-puff puff-crest"></div>
+          </div>
+        </div>
+
+        <!-- Cloud 3: Mid-Troposphere canopy (Y ≈ 1680m) -->
+        <div class="void-cloud-anchor" style="transform: translate3d(-320px, -1680px, 420px);">
+          <div class="void-cloud cloud-size-md" style="--drift-dur: 16s; --drift-delay: -6s;">
+            <div class="cloud-puff puff-base"></div>
+            <div class="cloud-puff puff-left"></div>
+            <div class="cloud-puff puff-center"></div>
+            <div class="cloud-puff puff-right"></div>
+            <div class="cloud-puff puff-crest"></div>
+          </div>
+        </div>
+
+        <!-- Cloud 4: Distant bank (Y ≈ 2050m) -->
+        <div class="void-cloud-anchor" style="transform: translate3d(520px, -2050px, -260px);">
+          <div class="void-cloud cloud-size-lg" style="--drift-dur: 20s; --drift-delay: -2s;">
+            <div class="cloud-puff puff-base"></div>
+            <div class="cloud-puff puff-left"></div>
+            <div class="cloud-puff puff-center"></div>
+            <div class="cloud-puff puff-right"></div>
+            <div class="cloud-puff puff-crest"></div>
+          </div>
+        </div>
+
+        <!-- Cloud 5: High Troposphere dome (Y ≈ 2420m) -->
+        <div class="void-cloud-anchor" style="transform: translate3d(-140px, -2420px, 160px);">
+          <div class="void-cloud cloud-size-md" style="--drift-dur: 17s; --drift-delay: -8s;">
+            <div class="cloud-puff puff-base"></div>
+            <div class="cloud-puff puff-left"></div>
+            <div class="cloud-puff puff-center"></div>
+            <div class="cloud-puff puff-right"></div>
+            <div class="cloud-puff puff-crest"></div>
+          </div>
+        </div>
+
+        <!-- Cloud 6: Lateral cumulus cluster (Y ≈ 2750m) -->
+        <div class="void-cloud-anchor" style="transform: translate3d(360px, -2750px, 340px);">
+          <div class="void-cloud cloud-size-sm" style="--drift-dur: 14s; --drift-delay: -5s;">
+            <div class="cloud-puff puff-base"></div>
+            <div class="cloud-puff puff-left"></div>
+            <div class="cloud-puff puff-center"></div>
+            <div class="cloud-puff puff-right"></div>
+            <div class="cloud-puff puff-crest"></div>
+          </div>
+        </div>
+
+        <!-- Cloud 7: Stratosphere threshold wisps (Y ≈ 3050m) -->
+        <div class="void-cloud-anchor" style="transform: translate3d(-380px, -3050px, -150px);">
+          <div class="void-cloud cloud-size-sm" style="--drift-dur: 19s; --drift-delay: -10s;">
+            <div class="cloud-puff puff-base"></div>
+            <div class="cloud-puff puff-left"></div>
+            <div class="cloud-puff puff-center"></div>
+            <div class="cloud-puff puff-right"></div>
+            <div class="cloud-puff puff-crest"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3D Cosmic Guardian Cat in Orbit (Y ≈ 5500m) -->
+      <div id="cosmicCat3D" title="Click or approach the Cosmic Guardian Cat!">
+        <div class="cat-antenna">
+          <div class="cat-antenna-beacon"></div>
+        </div>
+        <div class="cosmic-cat-helmet">
+          <div class="cat-helmet-glare"></div>
+          <div class="cat-ears-container">
+            <span class="cat-ear left">▲</span>
+            <span class="cat-ear right">▲</span>
+          </div>
+          <div class="cat-face-text">(=^･ω･^=)</div>
+        </div>
+        <div class="cosmic-cat-badge">
+          <span>COSMIC GUARDIAN CAT • 5,500m</span>
+        </div>
+      </div>
 
       <!-- The Page Plane / Card in 3D Space -->
       <div id="pageCard">
@@ -93,6 +219,10 @@
             </div>
             <div class="flex items-center space-x-2 sm:space-x-3">
               <span id="lastUpdated" class="text-xs text-slate-500 font-medium hidden md:inline"></span>
+              <button id="soundToggleBtn" type="button" class="text-xs px-2.5 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0" title="Enable sound effects (resets on reload)">
+                <span id="soundIcon" class="flex items-center shrink-0"></span>
+                <span id="soundLabel" class="text-[11px] font-medium text-slate-400">Sound Off</span>
+              </button>
               <button id="modeToggleBtn" type="button" class="text-xs px-2.5 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0" title="Toggle animation effects">
                 <span id="modeIcon" class="flex items-center shrink-0"></span>
                 <span id="modeLabel" class="text-[11px] font-medium text-slate-600">Juicy</span>
@@ -339,7 +469,7 @@
               <svg class="w-3.5 h-3.5 text-amber-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
               </svg>
-              <span id="eggCounterText">Secrets discovered: 0/10</span>
+              <span id="eggCounterText">Secrets discovered: 0/13</span>
             </div>
           </div>
         </footer>

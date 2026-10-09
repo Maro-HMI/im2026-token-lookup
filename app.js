@@ -6,7 +6,1201 @@
 
 let appConfig = null;
 let isJuicyMode = true;
+let isSoundEnabled = false;
 let currentStudentId = '';
+let isKawaiiMode = false;
+let isInTheVoid = false;
+
+// Persisted sound preferences
+const _SOUND_KEY = 'im_tokens_sound_enabled';
+
+function getStoredSoundPreference() {
+  try {
+    const val = localStorage.getItem(_SOUND_KEY);
+    return val === '1' || val === 'true';
+  } catch (e) {
+    return false;
+  }
+}
+
+function storeSoundPreference(enabled) {
+  try {
+    localStorage.setItem(_SOUND_KEY, enabled ? '1' : '0');
+  } catch (e) {}
+}
+
+// ==========================================================================
+// Procedural Web Audio Synthesizer (Juicy Mode SFX — Zero External Assets)
+// ==========================================================================
+
+const SoundEngine = (() => {
+  let audioCtx = null;
+  let noiseBuffer = null;
+  let chargeOsc = null;
+  let chargeSubOsc = null;
+  let chargeGain = null;
+  let lastChargeSparkTime = 0;
+  let chargeStartedAt = 0;
+  let lastPhysicsBounceSoundTime = 0;
+
+  function getCtx() {
+    if (!audioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      audioCtx = new Ctx();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+    return audioCtx;
+  }
+
+  // Ensure scheduled synthesis runs even if AudioContext was momentarily suspended (e.g. DevTools console focus)
+  function withCtx(callback) {
+    const ctx = getCtx();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(() => {
+        callback(ctx);
+      }).catch(() => {
+        callback(ctx);
+      });
+    } else {
+      callback(ctx);
+    }
+  }
+
+  function getNoiseBuffer(ctx) {
+    if (noiseBuffer) return noiseBuffer;
+    const sampleRate = ctx.sampleRate;
+    const length = Math.floor(sampleRate * 1.5);
+    const buf = ctx.createBuffer(1, length, sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    noiseBuffer = buf;
+    return noiseBuffer;
+  }
+
+  function canPlay() {
+    return isJuicyMode && isSoundEnabled;
+  }
+
+  // Helper: short filtered noise burst (for matte clicks, paper deals, felt slides, shatters)
+  function playNoiseBurst(durationSec, filterFreq, filterType = 'bandpass', q = 1.5, peakGain = 0.12, delaySec = 0) {
+    withCtx((ctx) => {
+      const t0 = ctx.currentTime + delaySec;
+      const src = ctx.createBufferSource();
+      src.buffer = getNoiseBuffer(ctx);
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = filterType;
+      filter.frequency.setValueAtTime(filterFreq, t0);
+      filter.Q.setValueAtTime(q, t0);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.linearRampToValueAtTime(peakGain, t0 + Math.min(0.005, durationSec * 0.2));
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationSec);
+
+      src.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      src.start(t0);
+      src.stop(t0 + durationSec + 0.015);
+    });
+  }
+
+  // Helper: warm oscillator tone with pitch glide and low-pass warmth
+  function playTone({
+    freqStart = 440,
+    freqEnd = null,
+    type = 'sine',
+    duration = 0.08,
+    gainPeak = 0.11,
+    delay = 0,
+    filterFreq = 2800
+  }) {
+    withCtx((ctx) => {
+      const t0 = ctx.currentTime + delay;
+      const osc = ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freqStart, t0);
+      if (freqEnd !== null && freqEnd !== freqStart) {
+        osc.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), t0 + duration);
+      }
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(filterFreq, t0);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.linearRampToValueAtTime(gainPeak, t0 + Math.min(0.006, duration * 0.2));
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(t0);
+      osc.stop(t0 + duration + 0.015);
+    });
+  }
+
+  return {
+    // 1. Sound Toggle ON (Crisp Switch Joy-Con two-note click: C5 -> G5, or pastel chime in Kawaii mode)
+    playToggleOn() {
+      if (isKawaiiMode) {
+        playTone({ freqStart: 1046.5, freqEnd: 1318.5, type: 'triangle', duration: 0.08, gainPeak: 0.10, filterFreq: 4000 });
+        playTone({ freqStart: 1567.98, freqEnd: 2093.0, type: 'sine', duration: 0.14, gainPeak: 0.11, delay: 0.05, filterFreq: 5000 });
+        return;
+      }
+      playNoiseBurst(0.016, 1800, 'bandpass', 1.8, 0.11, 0);
+      playTone({ freqStart: 523.25, freqEnd: 545, type: 'triangle', duration: 0.075, gainPeak: 0.11, delay: 0, filterFreq: 2400 });
+      playTone({ freqStart: 783.99, freqEnd: 810, type: 'sine', duration: 0.13, gainPeak: 0.12, delay: 0.055, filterFreq: 3000 });
+    },
+
+    // 2. Sound Toggle OFF / Switch to Vanilla (Soft muted power-down thud: E4 -> A3)
+    playToggleOff() {
+      if (isKawaiiMode) {
+        playTone({ freqStart: 659.25, freqEnd: 440.0, type: 'sine', duration: 0.09, gainPeak: 0.08, filterFreq: 1800 });
+        return;
+      }
+      playTone({ freqStart: 329.63, freqEnd: 196.0, type: 'sine', duration: 0.095, gainPeak: 0.09, delay: 0, filterFreq: 1100 });
+      playNoiseBurst(0.02, 700, 'lowpass', 1.0, 0.06, 0);
+    },
+
+    // 3. Lookup / Search Button Click (or magic wand sparkle cascade in Kawaii mode)
+    playLookupClick() {
+      if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiLookup();
+        return;
+      }
+      const jitter = 0.97 + Math.random() * 0.06;
+      playNoiseBurst(0.014, 1400 * jitter, 'bandpass', 1.8, 0.09, 0);
+      playTone({ freqStart: 240 * jitter, freqEnd: 140 * jitter, type: 'triangle', duration: 0.045, gainPeak: 0.095, filterFreq: 1300 });
+    },
+
+    // 4. Score Roll-Up Marimba Tick & Completion Bell Pop
+    playCounterTick(progress) {
+      if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiCounterTick(progress);
+        return;
+      }
+      const freq = 310 + progress * 340 + (Math.random() - 0.5) * 14;
+      playTone({ freqStart: freq, freqEnd: freq * 0.92, type: 'triangle', duration: 0.035, gainPeak: 0.055, filterFreq: 1800 });
+    },
+
+    playCounterPop(targetVal) {
+      if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiCounterPop(targetVal);
+        return;
+      }
+      if (targetVal >= 3.0) {
+        // Warm harmonic chord pop for Stockpiler (G5 + B5 + D6)
+        playTone({ freqStart: 783.99, type: 'sine', duration: 0.20, gainPeak: 0.09, delay: 0, filterFreq: 3000 });
+        playTone({ freqStart: 987.77, type: 'sine', duration: 0.24, gainPeak: 0.08, delay: 0.025, filterFreq: 3200 });
+        playTone({ freqStart: 1174.66, type: 'triangle', duration: 0.28, gainPeak: 0.075, delay: 0.05, filterFreq: 3400 });
+      } else {
+        playTone({ freqStart: 659.25, freqEnd: 685, type: 'sine', duration: 0.15, gainPeak: 0.085, filterFreq: 2600 });
+      }
+    },
+
+    // 5. Ledger Row Card-Dealing Tick
+    playLedgerDeal(index) {
+      if (!canPlay() || index > 7) return;
+      if (isKawaiiMode) {
+        this.playKawaiiLedgerDeal(index);
+        return;
+      }
+      const delay = index * 0.045;
+      const freq = (1250 + index * 65) * (0.96 + Math.random() * 0.08);
+      playNoiseBurst(0.018, freq, 'bandpass', 2.0, 0.06, delay);
+    },
+
+    // 6. Error / Not Found Alert (Low wooden marimba double-tap, or cute anime sad pout)
+    playErrorAlert() {
+      if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiSadPout();
+        return;
+      }
+      playTone({ freqStart: 174.61, freqEnd: 155.56, type: 'triangle', duration: 0.09, gainPeak: 0.11, delay: 0, filterFreq: 900 });
+      playTone({ freqStart: 146.83, freqEnd: 130.81, type: 'triangle', duration: 0.13, gainPeak: 0.11, delay: 0.095, filterFreq: 850 });
+    },
+
+    // 7. Secret #6 (0x6f) — Course Card Drag, Nudge, Swap & Settle
+    playCardPickup() {
+      if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiSquish();
+        return;
+      }
+      playTone({ freqStart: 180, freqEnd: 320, type: 'triangle', duration: 0.075, gainPeak: 0.095, filterFreq: 1500 });
+      playNoiseBurst(0.028, 950, 'bandpass', 1.4, 0.08, 0);
+    },
+
+    playCardNudge() {
+      if (!canPlay()) return;
+      playTone({ freqStart: 260, freqEnd: 210, type: 'sine', duration: 0.045, gainPeak: 0.07, filterFreq: 1100 });
+      playNoiseBurst(0.035, 750, 'bandpass', 1.2, 0.07, 0);
+    },
+
+    playCardSwap() {
+      if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiSwap();
+        return;
+      }
+      // Crisp card-shuffle whoosh + warm table thud + bright shuffle chord
+      playNoiseBurst(0.09, 1050, 'bandpass', 1.1, 0.16, 0);
+      playTone({ freqStart: 165, freqEnd: 72, type: 'triangle', duration: 0.13, gainPeak: 0.15, delay: 0.01, filterFreq: 750 });
+      playTone({ freqStart: 392.0, freqEnd: 523.25, type: 'triangle', duration: 0.12, gainPeak: 0.10, delay: 0.04, filterFreq: 2600 });
+      playTone({ freqStart: 587.33, freqEnd: 783.99, type: 'sine', duration: 0.16, gainPeak: 0.095, delay: 0.085, filterFreq: 3200 });
+    },
+
+    playCardSettle() {
+      if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiSqueak();
+        return;
+      }
+      playTone({ freqStart: 230, freqEnd: 135, type: 'sine', duration: 0.075, gainPeak: 0.085, filterFreq: 1000 });
+      playNoiseBurst(0.025, 650, 'lowpass', 1.2, 0.055, 0);
+    },
+
+    // 8. Secret #1 (0x1a) & Secret #9 (0x9i) — Token Balance Coin Flip & Overclock
+    playCoinFlip(isGetxr) {
+      if (!canPlay()) return;
+      const jitter = 0.985 + Math.random() * 0.03;
+      const bodyFreq = (isGetxr ? 783.99 : 880.0) * jitter;
+      const f1 = (isGetxr ? 1567.98 : 1760.0) * jitter;
+      const f2 = (isGetxr ? 2349.32 : 2637.02) * jitter;
+      // Thumb flick transient + warm coin body + bright metallic ring
+      playNoiseBurst(0.014, 2600, 'bandpass', 1.4, 0.11, 0);
+      playTone({ freqStart: bodyFreq * 0.75, freqEnd: bodyFreq, type: 'triangle', duration: 0.09, gainPeak: 0.11, delay: 0, filterFreq: 2800 });
+      playTone({ freqStart: f1, type: 'sine', duration: 0.32, gainPeak: 0.11, delay: 0.01, filterFreq: 4800 });
+      playTone({ freqStart: f2, type: 'sine', duration: 0.42, gainPeak: 0.085, delay: 0.03, filterFreq: 5500 });
+    },
+
+    playOverclockStart() {
+      if (!canPlay()) return;
+      // High-energy turbine spin-up zip when Overclock initiates
+      playNoiseBurst(0.06, 1600, 'bandpass', 1.4, 0.12, 0);
+      playTone({ freqStart: 220, freqEnd: 660, type: 'sawtooth', duration: 0.14, gainPeak: 0.09, delay: 0, filterFreq: 2400 });
+    },
+
+    playOverclockTick(progress) {
+      if (!canPlay()) return;
+      const freq = 440 + progress * 760;
+      playNoiseBurst(0.01, 2200 + progress * 1200, 'bandpass', 2.0, 0.065, 0);
+      playTone({ freqStart: freq, freqEnd: freq * 0.88, type: 'triangle', duration: 0.032, gainPeak: 0.085, filterFreq: 2800 });
+    },
+
+    playOverclockJackpot() {
+      if (!canPlay()) return;
+      // Jackpot bell cascade + coin shower shimmer
+      playNoiseBurst(0.08, 3000, 'bandpass', 1.2, 0.12, 0);
+      const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5, 1567.98, 2093.0];
+      notes.forEach((f, idx) => {
+        playTone({ freqStart: f, type: 'triangle', duration: 0.28, gainPeak: 0.10, delay: idx * 0.042, filterFreq: 4600 });
+      });
+    },
+
+    // 9. Secret #5 (0x5e) Logo Bobble & Secret #4 (0x4d) Golden Ticket Spin
+    playLogoBobble(isGetxr) {
+      if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiTwinkle();
+        return;
+      }
+      const base = isGetxr ? 246.94 : 293.66;
+      // Elastic rubber boing + shader-compiled harmonic chime
+      playTone({ freqStart: base, freqEnd: base * 1.95, type: 'triangle', duration: 0.095, gainPeak: 0.13, delay: 0, filterFreq: 2200 });
+      playTone({ freqStart: base * 1.95, freqEnd: base * 1.25, type: 'triangle', duration: 0.12, gainPeak: 0.11, delay: 0.075, filterFreq: 2200 });
+      playTone({ freqStart: base * 3.0, freqEnd: base * 4.0, type: 'sine', duration: 0.20, gainPeak: 0.09, delay: 0.11, filterFreq: 3800 });
+    },
+
+    playTicketSpin() {
+      if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiTwinkle();
+        return;
+      }
+      // Foil card spin whoosh + 4-note golden ticket sparkle arpeggio
+      playNoiseBurst(0.045, 1900, 'bandpass', 1.4, 0.11, 0);
+      const sparkle = [659.25, 880.0, 1174.66, 1760.0];
+      sparkle.forEach((f, idx) => {
+        playTone({ freqStart: f, freqEnd: f * 1.03, type: 'triangle', duration: 0.18, gainPeak: 0.10, delay: idx * 0.045, filterFreq: 4200 });
+      });
+    },
+
+    // 10. Secret #2 (0x2b) — Barrel Roll Aerodynamic Doppler Whoosh + Synth Sweep
+    playBarrelRoll() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const dur = 1.2;
+
+        // 1. Broadband aerodynamic wind whoosh
+        const src = ctx.createBufferSource();
+        src.buffer = getNoiseBuffer(ctx);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.Q.setValueAtTime(1.0, t0);
+        filter.frequency.setValueAtTime(220, t0);
+        filter.frequency.exponentialRampToValueAtTime(1350, t0 + dur * 0.45);
+        filter.frequency.exponentialRampToValueAtTime(180, t0 + dur);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.linearRampToValueAtTime(0.32, t0 + dur * 0.42);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+        src.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        src.start(t0);
+        src.stop(t0 + dur + 0.02);
+
+        // 2. Pitched aileron Doppler turbine sweep (makes the 360° roll unmistakably audible)
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(140, t0);
+        osc.frequency.exponentialRampToValueAtTime(520, t0 + dur * 0.45);
+        osc.frequency.exponentialRampToValueAtTime(125, t0 + dur * 0.95);
+
+        const oscFilter = ctx.createBiquadFilter();
+        oscFilter.type = 'lowpass';
+        oscFilter.frequency.setValueAtTime(1600, t0);
+
+        const oscGain = ctx.createGain();
+        oscGain.gain.setValueAtTime(0.0001, t0);
+        oscGain.gain.linearRampToValueAtTime(0.13, t0 + dur * 0.4);
+        oscGain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+        osc.connect(oscFilter);
+        oscFilter.connect(oscGain);
+        oscGain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + dur + 0.02);
+      });
+
+      // Crisp 360-degree lock chime at the end of the roll
+      playTone({ freqStart: 587.33, freqEnd: 880.0, type: 'triangle', duration: 0.14, gainPeak: 0.10, delay: 1.05, filterFreq: 3000 });
+    },
+
+    // 11. Secret #3 (0x3c) — Konami Code Step Blips & Cheat Mode Power-Up Fanfare
+    playKonamiStep(stepIndex) {
+      if (!canPlay()) return;
+      const scale = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25];
+      const freq = scale[Math.min(stepIndex, scale.length - 1)];
+      playTone({ freqStart: freq, freqEnd: freq * 1.04, type: 'square', duration: 0.048, gainPeak: 0.055, filterFreq: 1800 });
+    },
+
+    playKonamiCode() {
+      if (!canPlay()) return;
+      // Classic 16-bit cheat-code power-up fanfare + celebratory cannon thump
+      playTone({ freqStart: 130, freqEnd: 55, type: 'triangle', duration: 0.18, gainPeak: 0.14, delay: 0, filterFreq: 600 });
+      const fanfare = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5, 1318.51];
+      const delays  = [0.00,   0.06,   0.12,   0.18,   0.26,   0.33,   0.41];
+      const durs    = [0.08,   0.08,   0.08,   0.10,   0.08,   0.10,   0.32];
+      fanfare.forEach((f, idx) => {
+        playTone({ freqStart: f, type: 'triangle', duration: durs[idx], gainPeak: 0.11, delay: delays[idx], filterFreq: 3600 });
+      });
+    },
+
+    // 12. Secret #10 (0xaj) — Guardian Cat Purr Trill & Happy Meow
+    playCatPurr() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const dur = 0.95;
+
+        // 1. Audible AM-modulated purr trill (135 Hz + 270 Hz carrier modulated by 24 Hz LFO)
+        const carrier = ctx.createOscillator();
+        carrier.type = 'sawtooth';
+        carrier.frequency.setValueAtTime(130, t0);
+        carrier.frequency.linearRampToValueAtTime(155, t0 + dur * 0.5);
+        carrier.frequency.linearRampToValueAtTime(125, t0 + dur);
+
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.setValueAtTime(24, t0);
+
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.setValueAtTime(0.06, t0);
+
+        const modGain = ctx.createGain();
+        modGain.gain.setValueAtTime(0.07, t0);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(520, t0);
+
+        const env = ctx.createGain();
+        env.gain.setValueAtTime(0.0001, t0);
+        env.gain.linearRampToValueAtTime(1.0, t0 + 0.08);
+        env.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+
+        lfo.connect(lfoGain);
+        lfoGain.connect(modGain.gain);
+        carrier.connect(filter);
+        filter.connect(modGain);
+        modGain.connect(env);
+        env.connect(ctx.destination);
+
+        carrier.start(t0);
+        lfo.start(t0);
+        carrier.stop(t0 + dur + 0.02);
+        lfo.stop(t0 + dur + 0.02);
+
+        // 2. Expressive two-part cat "mew~!" overtone contour
+        const mew = ctx.createOscillator();
+        mew.type = 'triangle';
+        mew.frequency.setValueAtTime(520, t0 + 0.06);
+        mew.frequency.exponentialRampToValueAtTime(940, t0 + 0.19);
+        mew.frequency.exponentialRampToValueAtTime(680, t0 + 0.42);
+
+        const mewFilter = ctx.createBiquadFilter();
+        mewFilter.type = 'bandpass';
+        mewFilter.Q.setValueAtTime(1.4, t0 + 0.06);
+        mewFilter.frequency.setValueAtTime(1100, t0 + 0.06);
+
+        const mewGain = ctx.createGain();
+        mewGain.gain.setValueAtTime(0.0001, t0 + 0.06);
+        mewGain.gain.linearRampToValueAtTime(0.16, t0 + 0.14);
+        mewGain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.44);
+
+        mew.connect(mewFilter);
+        mewFilter.connect(mewGain);
+        mewGain.connect(ctx.destination);
+
+        mew.start(t0 + 0.06);
+        mew.stop(t0 + 0.46);
+      });
+    },
+
+    // 13. Secret / Achievement Unlock Chime & Telemetry Utilities
+    playSecretUnlock(isMaster = false, delayOffset = 0) {
+      if (!canPlay()) return;
+      if (isMaster) {
+        const chord = [523.25, 659.25, 783.99, 1046.5, 1318.5, 1567.98];
+        chord.forEach((f, idx) => {
+          playTone({ freqStart: f, type: 'triangle', duration: 0.40, gainPeak: 0.10, delay: delayOffset + idx * 0.055, filterFreq: 4000 });
+        });
+      } else {
+        const notes = [659.25, 830.61, 987.77, 1318.51]; // E5 -> G#5 -> B5 -> E6
+        notes.forEach((f, idx) => {
+          playTone({ freqStart: f, type: 'triangle', duration: 0.22, gainPeak: 0.09, delay: delayOffset + idx * 0.05, filterFreq: 3600 });
+        });
+      }
+    },
+
+    playTelemetryPing(count, total) {
+      if (!canPlay()) return;
+      const ratio = total > 0 ? (count / total) : 0;
+      const baseFreq = 440 + ratio * 340;
+      playTone({ freqStart: baseFreq, freqEnd: baseFreq * 1.25, type: 'sine', duration: 0.12, gainPeak: 0.09, delay: 0, filterFreq: 2800 });
+      playTone({ freqStart: baseFreq * 1.5, type: 'triangle', duration: 0.16, gainPeak: 0.075, delay: 0.05, filterFreq: 3200 });
+    },
+
+    playTelemetryReset() {
+      if (!canPlay()) return;
+      const notes = [783.99, 587.33, 440.0, 293.66];
+      notes.forEach((f, idx) => {
+        playTone({ freqStart: f, freqEnd: f * 0.92, type: 'triangle', duration: 0.09, gainPeak: 0.085, delay: idx * 0.045, filterFreq: 2000 });
+      });
+    },
+
+    // 14. Secret #7 (0x7g) & Secret #8 (0x8h) — 3D Void Charge-Up, Breakout, Walk & Egg Shatter
+    startVoidCharge() {
+      if (!canPlay()) return;
+      this.stopVoidCharge(false);
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        chargeStartedAt = performance.now();
+
+        chargeOsc = ctx.createOscillator();
+        chargeOsc.type = 'sawtooth';
+        chargeOsc.frequency.setValueAtTime(95, t0);
+
+        chargeSubOsc = ctx.createOscillator();
+        chargeSubOsc.type = 'triangle';
+        chargeSubOsc.frequency.setValueAtTime(190, t0);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(680, t0);
+
+        chargeGain = ctx.createGain();
+        chargeGain.gain.setValueAtTime(0.0001, t0);
+        chargeGain.gain.linearRampToValueAtTime(0.075, t0 + 0.06);
+
+        chargeOsc.connect(filter);
+        chargeSubOsc.connect(filter);
+        filter.connect(chargeGain);
+        chargeGain.connect(ctx.destination);
+
+        chargeOsc.start(t0);
+        chargeSubOsc.start(t0);
+        lastChargeSparkTime = performance.now();
+      });
+
+      // Initial press-down impact thump
+      playTone({ freqStart: 165, freqEnd: 65, type: 'triangle', duration: 0.12, gainPeak: 0.12, filterFreq: 700 });
+    },
+
+    updateVoidCharge(progress) {
+      if (!canPlay() || !chargeOsc || !chargeGain || !audioCtx) return;
+      const t = audioCtx.currentTime;
+      const baseFreq = 95 + Math.pow(progress, 1.3) * 320;
+      chargeOsc.frequency.setTargetAtTime(baseFreq, t, 0.03);
+      if (chargeSubOsc) {
+        chargeSubOsc.frequency.setTargetAtTime(baseFreq * 1.5, t, 0.03);
+      }
+      chargeGain.gain.setTargetAtTime(0.07 + progress * 0.09, t, 0.03);
+
+      // Escalating electrical spark crackles
+      const now = performance.now();
+      const sparkInterval = Math.max(40, 170 - progress * 130);
+      if (now - lastChargeSparkTime > sparkInterval) {
+        lastChargeSparkTime = now;
+        const sparkFreq = 1000 + progress * 1800 + (Math.random() - 0.5) * 350;
+        playNoiseBurst(0.015, sparkFreq, 'bandpass', 2.2, 0.06 + progress * 0.07, 0);
+      }
+    },
+
+    stopVoidCharge(playAbortZip = false) {
+      const heldMs = chargeStartedAt ? (performance.now() - chargeStartedAt) : 0;
+      chargeStartedAt = 0;
+      if (chargeOsc || chargeSubOsc) {
+        try {
+          if (chargeGain && audioCtx) {
+            chargeGain.gain.setTargetAtTime(0.0001, audioCtx.currentTime, 0.015);
+          }
+          const o1 = chargeOsc;
+          const o2 = chargeSubOsc;
+          setTimeout(() => {
+            try { if (o1) o1.stop(); } catch (e) {}
+            try { if (o2) o2.stop(); } catch (e) {}
+          }, 40);
+        } catch (e) {}
+        chargeOsc = null;
+        chargeSubOsc = null;
+        chargeGain = null;
+      }
+      // Only play abort zip if user actually held the charge for at least 180ms
+      if (playAbortZip && heldMs >= 180 && canPlay()) {
+        playTone({ freqStart: 240, freqEnd: 85, type: 'triangle', duration: 0.12, gainPeak: 0.09, filterFreq: 1100 });
+      }
+    },
+
+    playVoidBreakout() {
+      this.stopVoidCharge(false);
+      if (!canPlay()) return;
+      // Deep dimensional sub-bass release + reality shatter + shimmering Void chord
+      playTone({ freqStart: 180, freqEnd: 48, type: 'triangle', duration: 0.45, gainPeak: 0.18, delay: 0, filterFreq: 650 });
+      playNoiseBurst(0.22, 1400, 'bandpass', 1.0, 0.18, 0);
+      const voidChord = [523.25, 783.99, 987.77, 1318.51, 1567.98];
+      voidChord.forEach((f, idx) => {
+        playTone({ freqStart: f, type: 'triangle', duration: 0.48, gainPeak: 0.085, delay: 0.04 + idx * 0.045, filterFreq: 3800 });
+      });
+    },
+
+    playVoidExit() {
+      this.stopVoidCharge(false);
+      if (!canPlay()) return;
+      playTone({ freqStart: 580, freqEnd: 175, type: 'triangle', duration: 0.26, gainPeak: 0.11, filterFreq: 1800 });
+      playNoiseBurst(0.14, 900, 'bandpass', 1.2, 0.10, 0);
+    },
+
+    playFootstep(isRunning) {
+      if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiPaws(isRunning);
+        return;
+      }
+      const jitter = 0.94 + Math.random() * 0.12;
+      const freq = (isRunning ? 145 : 115) * jitter;
+      playTone({ freqStart: freq, freqEnd: freq * 0.55, type: 'triangle', duration: 0.045, gainPeak: isRunning ? 0.075 : 0.055, filterFreq: 650 });
+      playNoiseBurst(0.015, (isRunning ? 1200 : 900) * jitter, 'bandpass', 1.8, isRunning ? 0.05 : 0.035, 0);
+    },
+
+    playJump(isRunning) {
+      if (!canPlay()) return;
+      const peak = isRunning ? 460 : 380;
+      playTone({ freqStart: 160, freqEnd: peak, type: 'triangle', duration: 0.14, gainPeak: 0.10, filterFreq: 1800 });
+      playNoiseBurst(0.06, 1100, 'bandpass', 1.4, 0.065, 0);
+    },
+
+    playLand() {
+      if (!canPlay()) return;
+      playTone({ freqStart: 130, freqEnd: 55, type: 'triangle', duration: 0.095, gainPeak: 0.11, filterFreq: 550 });
+      playNoiseBurst(0.03, 650, 'lowpass', 1.2, 0.065, 0);
+    },
+
+    // 15. Atmospheric Ascent (0xbk) — Thrusters, Superhero Impact & Orbital Audio
+    playThrusterJump(tier = 0) {
+      if (!canPlay()) return;
+      const base = 220 + Math.min(3, tier) * 65;
+      playTone({ freqStart: base, freqEnd: base * 1.85, type: 'triangle', duration: 0.15, gainPeak: 0.10, filterFreq: 2400 });
+      playNoiseBurst(0.08, 1100 + tier * 300, 'bandpass', 1.3, 0.085, 0);
+    },
+
+    playSuperheroLanding() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        // Deep seismic sub-bass earthquake impact (260Hz -> 28Hz)
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(260, t0);
+        osc.frequency.exponentialRampToValueAtTime(28, t0 + 0.65);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(450, t0);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.linearRampToValueAtTime(0.35, t0 + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.65);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.7);
+
+        // Explosive shockwave crack + reverberant rumble
+        playNoiseBurst(0.24, 950, 'lowpass', 1.0, 0.22, 0);
+        playTone({ freqStart: 110, freqEnd: 45, type: 'sawtooth', duration: 0.35, gainPeak: 0.12, filterFreq: 350 });
+      });
+    },
+
+    playOrbitalEntry() {
+      if (!canPlay()) return;
+      const spaceNotes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+      spaceNotes.forEach((f, idx) => {
+        playTone({
+          freqStart: f,
+          freqEnd: f * 1.01,
+          type: 'sine',
+          duration: 0.65,
+          gainPeak: 0.07,
+          delay: idx * 0.065,
+          filterFreq: 4000
+        });
+      });
+    },
+
+    playOrbitalPurr() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const carrier = ctx.createOscillator();
+        carrier.type = 'triangle';
+        carrier.frequency.setValueAtTime(160, t0);
+
+        const lfo = ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.setValueAtTime(26, t0); // rapid purr flutter
+
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.setValueAtTime(60, t0);
+        lfo.connect(carrier.frequency);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(750, t0);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.linearRampToValueAtTime(0.18, t0 + 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.55);
+
+        carrier.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+
+        carrier.start(t0);
+        lfo.start(t0);
+        carrier.stop(t0 + 0.58);
+        lfo.stop(t0 + 0.58);
+
+        // High crystal chime
+        const chimes = [1046.5, 1318.51, 1567.98, 2093.0];
+        chimes.forEach((f, idx) => {
+          playTone({ freqStart: f, type: 'sine', duration: 0.35, gainPeak: 0.08, delay: 0.08 + idx * 0.06, filterFreq: 4500 });
+        });
+      });
+    },
+
+    playEggShatter() {
+      if (!canPlay()) return;
+      // Crisp crystal shatter + sparkling golden cascade
+      playNoiseBurst(0.07, 2600, 'bandpass', 1.2, 0.18, 0);
+      playTone({ freqStart: 220, freqEnd: 85, type: 'triangle', duration: 0.15, gainPeak: 0.12, delay: 0, filterFreq: 800 });
+      const notes = [1046.5, 1318.5, 1567.98, 2093.0, 2637.02];
+      notes.forEach((f, idx) => {
+        playTone({ freqStart: f, type: 'triangle', duration: 0.34, gainPeak: 0.10, delay: 0.02 + idx * 0.045, filterFreq: 5000 });
+      });
+    },
+
+    // 16. Gravity Mode (0xcl) — Collapse Drop, Physics Impacts & Anti-Gravity Restore
+    playGravityDrop() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(260, t0);
+        osc.frequency.exponentialRampToValueAtTime(36, t0 + 0.65);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(550, t0);
+        filter.frequency.linearRampToValueAtTime(110, t0 + 0.65);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.linearRampToValueAtTime(0.24, t0 + 0.035);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.65);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.7);
+
+        playNoiseBurst(0.24, 480, 'lowpass', 1.1, 0.14, 0.02);
+      });
+    },
+
+    playPhysicsBounce(impactSpeed = 10) {
+      if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiMochiBounce(impactSpeed);
+        return;
+      }
+      const now = performance.now();
+      if (now - lastPhysicsBounceSoundTime < 60) return;
+      lastPhysicsBounceSoundTime = now;
+
+      const norm = Math.min(1.0, impactSpeed / 20.0);
+      const toneFreq = 160 + (1 - norm) * 120;
+      playTone({
+        freqStart: toneFreq,
+        freqEnd: toneFreq * 0.55,
+        type: 'triangle',
+        duration: 0.045,
+        gainPeak: 0.05 + norm * 0.08,
+        filterFreq: 800 + norm * 600
+      });
+      playNoiseBurst(0.022, 1100, 'bandpass', 1.8, 0.04 + norm * 0.06, 0);
+    },
+
+    playCardKick(intensity = 1.0) {
+      if (!canPlay()) return;
+      if (isKawaiiMode) {
+        this.playKawaiiCardKick(intensity);
+        return;
+      }
+      const now = performance.now();
+      if (now - lastPhysicsBounceSoundTime < 70) return;
+      lastPhysicsBounceSoundTime = now;
+
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const norm = Math.max(0.4, Math.min(2.0, intensity));
+
+        // 1. Meaty low-end foot impact thump (150Hz -> 36Hz)
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(140 * norm, t0);
+        osc.frequency.exponentialRampToValueAtTime(36, t0 + 0.12);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.001, t0);
+        gain.gain.linearRampToValueAtTime(0.26 * norm, t0 + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.14);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.15);
+
+        // 2. High-frequency leather-on-card contact slap
+        playNoiseBurst(0.035, 1400, 'bandpass', 2.0, 0.12 * norm, 0);
+
+        // 3. Sliding / scraping texture
+        playNoiseBurst(0.07, 650, 'lowpass', 1.0, 0.05 * norm, 0.015);
+      });
+    },
+
+    playGravityRestore() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(50, t0);
+        osc.frequency.exponentialRampToValueAtTime(460, t0 + 0.45);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.linearRampToValueAtTime(0.18, t0 + 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.52);
+
+        const notes = [523.25, 659.25, 783.99, 1046.5];
+        notes.forEach((f, idx) => {
+          playTone({ freqStart: f, type: 'triangle', duration: 0.28, gainPeak: 0.085, delay: 0.14 + idx * 0.06, filterFreq: 4000 });
+        });
+      });
+    },
+
+    playZeroGToggle(active) {
+      if (!canPlay()) return;
+      if (active) {
+        playNoiseBurst(0.28, 1800, 'bandpass', 1.4, 0.14, 0);
+        playTone({ freqStart: 220, freqEnd: 880, type: 'sine', duration: 0.35, gainPeak: 0.09, filterFreq: 2600 });
+      } else {
+        playNoiseBurst(0.18, 750, 'lowpass', 1.2, 0.14, 0);
+        playTone({ freqStart: 380, freqEnd: 120, type: 'sawtooth', duration: 0.25, gainPeak: 0.10, filterFreq: 900 });
+      }
+    },
+
+    // 17. Kawaii Mode (0xdm) — Magical Fanfare, Rubbery Boings & Cat Purrs
+    playKawaiiFanfare() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const notes = [1046.5, 1318.51, 1567.98, 1975.53, 2093.0]; // C6, E6, G6, B6, C7
+        notes.forEach((freq, idx) => {
+          playTone({
+            freqStart: freq,
+            freqEnd: freq * 1.02,
+            type: 'sine',
+            duration: 0.38,
+            gainPeak: 0.08,
+            delay: idx * 0.055,
+            filterFreq: 5500
+          });
+        });
+        playNoiseBurst(0.18, 3200, 'highpass', 2.0, 0.04, 0.12);
+      });
+    },
+
+    playKawaiiBoing() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(220, t0);
+        osc.frequency.exponentialRampToValueAtTime(640, t0 + 0.12);
+        osc.frequency.exponentialRampToValueAtTime(360, t0 + 0.22);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.001, t0);
+        gain.gain.linearRampToValueAtTime(0.18, t0 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.24);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.25);
+      });
+    },
+
+    playKawaiiPurr() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(68, t0);
+
+        const mod = ctx.createOscillator();
+        mod.frequency.setValueAtTime(24, t0);
+        const modGain = ctx.createGain();
+        modGain.gain.setValueAtTime(18, t0);
+        mod.connect(modGain);
+        modGain.connect(osc.frequency);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.001, t0);
+        gain.gain.linearRampToValueAtTime(0.12, t0 + 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.45);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        mod.start(t0);
+        osc.start(t0);
+        mod.stop(t0 + 0.46);
+        osc.stop(t0 + 0.46);
+      });
+    },
+
+    playKawaiiMeow() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(680, t0);
+        osc.frequency.exponentialRampToValueAtTime(1080, t0 + 0.12);
+        osc.frequency.exponentialRampToValueAtTime(820, t0 + 0.32);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.Q.setValueAtTime(2.2, t0);
+        filter.frequency.setValueAtTime(1200, t0);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.linearRampToValueAtTime(0.18, t0 + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.36);
+      });
+    },
+
+    playKawaiiLookup() {
+      if (!canPlay()) return;
+      // Magic star wand chirp + bubble pop + pentatonic chime cascade
+      playTone({ freqStart: 880, freqEnd: 1760, type: 'sine', duration: 0.12, gainPeak: 0.12, filterFreq: 4000 });
+      const chime = [1046.5, 1318.5, 1567.98, 2093.0];
+      chime.forEach((f, idx) => {
+        playTone({ freqStart: f, type: 'triangle', duration: 0.22, gainPeak: 0.08, delay: 0.04 + idx * 0.045, filterFreq: 5000 });
+      });
+    },
+
+    playKawaiiKeypress() {
+      if (!canPlay()) return;
+      const jitter = 0.92 + Math.random() * 0.16;
+      const freq = 980 * jitter;
+      playTone({ freqStart: freq, freqEnd: freq * 1.35, type: 'sine', duration: 0.04, gainPeak: 0.065, filterFreq: 3200 });
+    },
+
+    playKawaiiSadPout() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(820, t0);
+        osc.frequency.exponentialRampToValueAtTime(540, t0 + 0.18);
+        osc.frequency.exponentialRampToValueAtTime(420, t0 + 0.42);
+
+        const lfo = ctx.createOscillator();
+        lfo.frequency.setValueAtTime(6.5, t0); // vibrato wobble
+        const lfoGain = ctx.createGain();
+        lfoGain.gain.setValueAtTime(14, t0);
+        lfo.connect(lfoGain);
+        lfoGain.connect(osc.frequency);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1400, t0);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.linearRampToValueAtTime(0.14, t0 + 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.45);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        lfo.start(t0);
+        osc.start(t0);
+        lfo.stop(t0 + 0.46);
+        osc.stop(t0 + 0.46);
+      });
+    },
+
+    playKawaiiCounterTick(progress) {
+      if (!canPlay()) return;
+      const base = 1046.5; // C6
+      const freq = base + (progress * 523.25) + (Math.random() - 0.5) * 20;
+      playTone({ freqStart: freq, type: 'sine', duration: 0.045, gainPeak: 0.06, filterFreq: 4500 });
+    },
+
+    playKawaiiCounterPop(val) {
+      if (!canPlay()) return;
+      const notes = [1046.5, 1318.5, 1567.98, 2093.0, 2637.02];
+      notes.forEach((f, idx) => {
+        playTone({ freqStart: f, freqEnd: f * 1.02, type: 'sine', duration: 0.28, gainPeak: 0.085, delay: idx * 0.045, filterFreq: 5500 });
+      });
+    },
+
+    playKawaiiLedgerDeal(index) {
+      if (!canPlay() || index > 7) return;
+      const pentatonic = [1046.5, 1174.66, 1318.51, 1567.98, 1760.0];
+      const freq = pentatonic[index % pentatonic.length] * (0.98 + Math.random() * 0.04);
+      playTone({ freqStart: freq, freqEnd: freq * 1.15, type: 'sine', duration: 0.065, gainPeak: 0.07, delay: index * 0.04, filterFreq: 4200 });
+    },
+
+    playKawaiiSquish() {
+      if (!canPlay()) return;
+      playTone({ freqStart: 380, freqEnd: 640, type: 'triangle', duration: 0.08, gainPeak: 0.09, filterFreq: 1800 });
+    },
+
+    playKawaiiSwap() {
+      if (!canPlay()) return;
+      playTone({ freqStart: 520, freqEnd: 780, type: 'sine', duration: 0.12, gainPeak: 0.10, filterFreq: 2800 });
+      playTone({ freqStart: 780, freqEnd: 1046.5, type: 'triangle', duration: 0.16, gainPeak: 0.08, delay: 0.04, filterFreq: 3400 });
+    },
+
+    playKawaiiSqueak() {
+      if (!canPlay()) return;
+      playTone({ freqStart: 720, freqEnd: 480, type: 'sine', duration: 0.07, gainPeak: 0.08, filterFreq: 2200 });
+    },
+
+    playKawaiiTwinkle() {
+      if (!canPlay()) return;
+      const harp = [1318.51, 1567.98, 1975.53, 2637.02];
+      harp.forEach((f, idx) => {
+        playTone({ freqStart: f, type: 'sine', duration: 0.22, gainPeak: 0.075, delay: idx * 0.04, filterFreq: 5000 });
+      });
+    },
+
+    playKawaiiPaws(isRunning) {
+      if (!canPlay()) return;
+      const jitter = 0.95 + Math.random() * 0.10;
+      const freq = (isRunning ? 340 : 280) * jitter;
+      playTone({ freqStart: freq, freqEnd: freq * 0.75, type: 'sine', duration: 0.04, gainPeak: isRunning ? 0.065 : 0.045, filterFreq: 1100 });
+    },
+
+    playKawaiiMochiBounce(impactSpeed = 10) {
+      if (!canPlay()) return;
+      const now = performance.now();
+      if (now - lastPhysicsBounceSoundTime < 65) return;
+      lastPhysicsBounceSoundTime = now;
+      const norm = Math.min(1.0, impactSpeed / 20.0);
+      const base = 280 + norm * 160;
+      playTone({ freqStart: base, freqEnd: base * 1.8, type: 'sine', duration: 0.065, gainPeak: 0.06 + norm * 0.08, filterFreq: 2200 });
+    },
+
+    playKawaiiCardKick(intensity = 1.0) {
+      if (!canPlay()) return;
+      const now = performance.now();
+      if (now - lastPhysicsBounceSoundTime < 70) return;
+      lastPhysicsBounceSoundTime = now;
+      const norm = Math.max(0.4, Math.min(2.0, intensity));
+      playTone({ freqStart: 260 * norm, freqEnd: 540 * norm, type: 'sine', duration: 0.09, gainPeak: 0.14 * norm, filterFreq: 2600 });
+      playTone({ freqStart: 540 * norm, freqEnd: 320 * norm, type: 'triangle', duration: 0.11, gainPeak: 0.10 * norm, delay: 0.04, filterFreq: 2200 });
+    },
+
+    suspendCtx() {
+      if (audioCtx && audioCtx.state === 'running') {
+        audioCtx.suspend().catch(() => {});
+      }
+    },
+
+    resumeCtx() {
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
+    }
+  };
+})();
+
+function updateSoundUI() {
+  const soundBtn = document.getElementById('soundToggleBtn');
+  const soundIcon = document.getElementById('soundIcon');
+  const soundLabel = document.getElementById('soundLabel');
+  if (!soundBtn) return;
+
+  if (!isJuicyMode) {
+    soundBtn.classList.add('hidden');
+    return;
+  }
+
+  soundBtn.classList.remove('hidden');
+
+  if (isSoundEnabled) {
+    soundBtn.className = isKawaiiMode
+      ? 'text-xs px-2.5 py-1.5 rounded-full border border-pink-200 bg-pink-50/80 hover:bg-pink-100/70 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0'
+      : 'text-xs px-2.5 py-1.5 rounded-full border border-blue-200 bg-blue-50/70 hover:bg-blue-50 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0';
+    soundBtn.setAttribute('title', isKawaiiMode ? 'Mute sound effects nya~' : 'Mute sound effects');
+    if (soundIcon) {
+      soundIcon.innerHTML = isKawaiiMode
+        ? `<svg class="w-3.5 h-3.5 text-pink-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`
+        : `<svg class="w-3.5 h-3.5 text-blue-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>`;
+    }
+    if (soundLabel) {
+      soundLabel.className = isKawaiiMode ? 'text-[11px] font-semibold text-pink-700' : 'text-[11px] font-semibold text-blue-700';
+      soundLabel.textContent = isKawaiiMode ? 'Sound On-nya! 🐾' : 'Sound On';
+    }
+  } else {
+    soundBtn.className = isKawaiiMode
+      ? 'text-xs px-2.5 py-1.5 rounded-full border border-pink-200 bg-white hover:bg-pink-50/60 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0'
+      : 'text-xs px-2.5 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition flex items-center space-x-1.5 shadow-2xs cursor-pointer select-none shrink-0';
+    soundBtn.setAttribute('title', isKawaiiMode ? 'Enable cute sounds ~desu! ✨' : 'Enable sound effects');
+    if (soundIcon) {
+      soundIcon.innerHTML = isKawaiiMode
+        ? `<svg class="w-3.5 h-3.5 text-pink-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></svg>`
+        : `<svg class="w-3.5 h-3.5 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></svg>`;
+    }
+    if (soundLabel) {
+      soundLabel.className = isKawaiiMode ? 'text-[11px] font-medium text-pink-500' : 'text-[11px] font-medium text-slate-500';
+      soundLabel.textContent = isKawaiiMode ? 'Sound Off nya (´-ω-｀)' : 'Sound Off';
+    }
+  }
+}
+
+function setSoundEnabled(enabled, playFeedback = true, persist = true) {
+  const target = Boolean(enabled);
+  if (persist) {
+    storeSoundPreference(target);
+  }
+
+  if (!isJuicyMode) {
+    isSoundEnabled = false;
+    SoundEngine.stopVoidCharge(false);
+    SoundEngine.suspendCtx();
+    updateSoundUI();
+    return;
+  }
+
+  const wasEnabled = isSoundEnabled;
+  isSoundEnabled = target;
+  updateSoundUI();
+
+  if (isSoundEnabled) {
+    SoundEngine.resumeCtx();
+  } else {
+    SoundEngine.suspendCtx();
+  }
+
+  if (playFeedback) {
+    if (isSoundEnabled && !wasEnabled) {
+      SoundEngine.playToggleOn();
+    } else if (!isSoundEnabled && wasEnabled) {
+      SoundEngine.stopVoidCharge(false);
+      SoundEngine.playToggleOff();
+    }
+  } else if (!isSoundEnabled) {
+    SoundEngine.stopVoidCharge(false);
+  }
+}
 
 // Particle Canvas State
 let canvas = null;
@@ -58,33 +1252,207 @@ async function loadConfig() {
 // Mode Management (Juicy vs Vanilla)
 // ==========================================================================
 
+let _origHeroSubtitle = null;
+let _origPlaceholder = null;
+let _origSubmitText = null;
+
+// ==========================================================================
+// Kawaii Anime Cat Language (Localization & Microcopy Engine)
+// ==========================================================================
+const _origUiStrings = {};
+
+function _saveAndSet(key, el, text, active) {
+  if (!el) return;
+  if (_origUiStrings[key] === undefined) {
+    _origUiStrings[key] = el.innerHTML;
+  }
+  el.innerHTML = active ? text : _origUiStrings[key];
+}
+
+function _saveAndSetText(key, el, text, active) {
+  if (!el) return;
+  if (_origUiStrings[key] === undefined) {
+    _origUiStrings[key] = el.textContent;
+  }
+  el.textContent = active ? text : _origUiStrings[key];
+}
+
+function cutifyLedgerReason(reason) {
+  if (!reason) return 'Token update-nya! ✨';
+  let t = reason.trim();
+  if (t.endsWith('.')) t = t.slice(0, -1);
+  if (/initial/i.test(t)) return `${t} ~desu 🐾`;
+  if (/attendance|wooclap/i.test(t)) return `${t} nya~! 🌸`;
+  if (/bonus|wrapup|extra|credit/i.test(t)) return `${t}-nya! 🎁`;
+  if (/spent|extension|assignment|late/i.test(t)) return `${t} nya~ ⏰`;
+  return `${t} ~desu ✨`;
+}
+
+function updateKawaiiStaticTexts(active) {
+  // 1. Header title & subtitle
+  const headerTitle = document.querySelector('header h1');
+  if (headerTitle) {
+    _saveAndSetText('headerTitle', headerTitle, 'IM 2026 Token Lookup ~desu! (✿◠‿◠)', active);
+  }
+  const headerSub = document.querySelector('header .bg-slate-100');
+  if (headerSub) {
+    _saveAndSetText('headerSub', headerSub, 'GETXR & 3DMA nya~ 🐾', active);
+  }
+
+  // 2. Hero title & subtitle
+  const heroTitle = document.querySelector('#mainContainer h2');
+  if (heroTitle) {
+    _saveAndSetText('heroTitle', heroTitle, 'Check Late Token Balance ~desu! (✿◠‿◠)', active);
+  }
+  const heroSub = document.querySelector('#mainContainer p.text-slate-500');
+  if (heroSub) {
+    _saveAndSetText('heroSub', heroSub, 'Check your late tokens, Wooclap credits & extension stars-nya! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ ~desu', active);
+  }
+
+  // 3. Search Form helper & input label
+  const formHelper = document.querySelector('#tokenForm + p, #tokenForm p.text-slate-500');
+  if (formHelper) {
+    _saveAndSetText('formHelper', formHelper, "Accepts 7-digit student number with or without 's' nya~ (e.g. s1234567)! Bookmarks supported ~desu ✨", active);
+  }
+  const inputLabel = document.querySelector('#tokenForm span.font-mono');
+  if (inputLabel) {
+    _saveAndSetText('inputLabel', inputLabel, 'ID nya:', active);
+  }
+
+  // 4. Student record header & Clear button
+  const recordLabel = document.querySelector('#resultsContainer .bg-blue-50\\/80 span.font-medium');
+  if (recordLabel) {
+    _saveAndSetText('recordLabel', recordLabel, 'Student record-nya:', active);
+  }
+  const clearBtn = document.getElementById('clearSearchBtn');
+  if (clearBtn) {
+    _saveAndSetText('clearBtn', clearBtn, 'Look up another ID nya~ 🔍', active);
+  }
+
+  // 5. Bookmark tip banner
+  const bookmarkBanner = document.querySelector('#resultsContainer .bg-amber-50\\/70 span:not(.space-x-2 span)');
+  if (bookmarkBanner) {
+    const originalHtml = '<strong>Bookmark your balance:</strong> Save this URL <span class="hidden sm:inline">(or press <kbd class="px-1.5 py-0.5 font-mono text-[10px] bg-white border border-amber-300 rounded text-amber-900 shadow-2xs">Cmd/Ctrl + D</kbd>)</span> to check anytime.';
+    const kawaiiHtml = '<strong>Bookmark your balance nya~!</strong> Save this URL <span class="hidden sm:inline">(or press <kbd class="px-1.5 py-0.5 font-mono text-[10px] bg-white border border-pink-300 rounded text-pink-900 shadow-2xs">Cmd/Ctrl + D</kbd>)</span> to check anytime ~desu! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧';
+    _saveAndSet('bookmarkBanner', bookmarkBanner, kawaiiHtml, active);
+  }
+
+  // 6. Course card subtitles
+  const getxrSub = document.querySelector('#cardGetxr p.text-slate-500');
+  if (getxrSub) {
+    _saveAndSetText('getxrSub', getxrSub, 'Game Engine Tech & XR Dev-nya 🎮', active);
+  }
+  const threedmaSub = document.querySelector('#card3dma p.text-slate-500');
+  if (threedmaSub) {
+    _saveAndSetText('threedmaSub', threedmaSub, '3D Modeling & Animation-nya 🎨', active);
+  }
+
+  // 7. Policy Info Accordion
+  const policyTitle = document.querySelector('#mainContainer h4.font-heading');
+  if (policyTitle) {
+    const span = policyTitle.querySelector('span');
+    if (span) {
+      _saveAndSetText('policyTitle', span, 'Late Token Rules & Policies ~desu 📖', active);
+    }
+  }
+  const policyBoxes = document.querySelectorAll('#mainContainer .grid-cols-1.sm\\:grid-cols-3 > div');
+  if (policyBoxes && policyBoxes.length === 3) {
+    const titles = [
+      active ? '+24h Extension nya~ ⏰' : '+24h Extension',
+      active ? 'Earn Extra Tokens nya! 🌸' : 'Earn Extra Tokens',
+      active ? 'Grade Bonus ~desu 🏆' : 'Grade Bonus'
+    ];
+    policyBoxes.forEach((box, i) => {
+      const span = box.querySelector('span > span');
+      if (span) {
+        _saveAndSetText(`policyBox${i}`, span, titles[i], active);
+      }
+    });
+  }
+
+  // 8. Footer
+  const footerP1 = document.querySelector('footer p.font-medium');
+  if (footerP1) {
+    _saveAndSetText('footerP1', footerP1, 'Creative Technology · Module 5: Interactive Media ~desu (✿◠‿◠)', active);
+  }
+  const footerP2 = document.querySelector('footer p.text-\\[11px\\]');
+  if (footerP2) {
+    _saveAndSetText('footerP2', footerP2, 'Zero database nya~ · Client-side hash lookup desu · Privacy protected 🐾', active);
+  }
+
+  // 9. Void Controls & Return Button
+  const voidControlsGuide = document.getElementById('voidControlsGuide');
+  if (voidControlsGuide) {
+    const kawaiiControls = '<span>Walk nya: <span class="kbd-pill">W A S D</span></span> <span>•</span> <span>Look: <span class="kbd-pill">Drag</span></span> <span>•</span> <span>Pounce nya: <span class="kbd-pill">Space</span></span> <span>•</span> <span>Zoomies: <span class="kbd-pill">Shift</span></span>';
+    _saveAndSet('voidControlsGuide', voidControlsGuide, kawaiiControls, active);
+  }
+  const returnBtn = document.getElementById('returnToScreenBtn');
+  if (returnBtn) {
+    const span = returnBtn.querySelector('span');
+    if (span) {
+      _saveAndSetText('returnBtnSpan', span, 'Return to Screen nya~ (Esc)', active);
+    }
+  }
+}
+
 function checkFxPreference() {
   const href = window.location.href.toLowerCase();
+  if (href.includes('kawaii') || href.includes('mode=kawaii')) {
+    return 'kawaii';
+  }
   // URL flag has highest precedence for bookmarks
   if (href.includes('vanilla') || href.includes('calm') || href.includes('plain') || href.includes('fx=0') || href.includes('no-fx')) {
-    return false;
+    return 'vanilla';
   }
   if (href.includes('juicy') || href.includes('fx=1')) {
-    return true;
+    return 'juicy';
   }
   // Local storage preference
   try {
     const stored = localStorage.getItem('im_tokens_fx_mode');
-    if (stored !== null) {
-      return stored === 'juicy';
+    if (stored === 'kawaii' || stored === 'juicy' || stored === 'vanilla') {
+      return stored;
     }
   } catch (e) {}
   // System prefers-reduced-motion
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    return false;
+    return 'vanilla';
   }
-  return true; // default
+  return 'juicy'; // default
 }
 
-function setMode(juicy, updateUrl = true) {
-  isJuicyMode = juicy;
+function setMode(modeOrJuicy, updateUrl = true) {
+  let mode;
+  if (typeof modeOrJuicy === 'boolean') {
+    mode = modeOrJuicy ? 'juicy' : 'vanilla';
+  } else {
+    mode = modeOrJuicy || 'juicy';
+  }
+
+  const wasJuicy = isJuicyMode;
+  const wasKawaii = isKawaiiMode;
+
+  if (mode === 'kawaii') {
+    isKawaiiMode = true;
+    isJuicyMode = true;
+  } else if (mode === 'juicy') {
+    isKawaiiMode = false;
+    isJuicyMode = true;
+  } else {
+    isKawaiiMode = false;
+    isJuicyMode = false;
+  }
+
+  // Restore stored sound preference when entering Juicy/Kawaii modes
+  if (isJuicyMode) {
+    isSoundEnabled = getStoredSoundPreference();
+    if (isSoundEnabled) {
+      SoundEngine.resumeCtx();
+    }
+  }
+
   try {
-    localStorage.setItem('im_tokens_fx_mode', juicy ? 'juicy' : 'vanilla');
+    localStorage.setItem('im_tokens_fx_mode', mode);
   } catch (e) {}
 
   const toggleBtn = document.getElementById('modeToggleBtn');
@@ -98,21 +1466,89 @@ function setMode(juicy, updateUrl = true) {
   const cardGetxr = document.getElementById('cardGetxr');
   const card3dma = document.getElementById('card3dma');
 
-  if (juicy) {
+  // Microcopy elements
+  const heroSub = document.querySelector('#mainContainer p.text-slate-500');
+  const studentInput = document.getElementById('studentIdInput');
+  const submitBtn = document.getElementById('submitBtn');
+
+  if (heroSub && !_origHeroSubtitle) _origHeroSubtitle = heroSub.textContent;
+  if (studentInput && !_origPlaceholder) _origPlaceholder = studentInput.placeholder;
+  if (submitBtn && !_origSubmitText) {
+    const span = submitBtn.querySelector('span');
+    if (span) _origSubmitText = span.textContent;
+  }
+
+  if (isKawaiiMode) {
     document.body.classList.add('juicy-mode');
+    document.body.classList.add('kawaii-mode');
+    document.body.classList.remove('vanilla-mode');
+
+    if (modeIcon) {
+      modeIcon.innerHTML = `<span class="text-xs shrink-0 select-none">🌸</span>`;
+    }
+    if (modeLabel) modeLabel.textContent = '✨ Kawaii';
+    if (toggleBtn) {
+      toggleBtn.setAttribute('title', '✨ Kawaii Mode Active! (Click to switch to Vanilla)');
+      spawnBurstAtElement(toggleBtn, ['#fbcfe8', '#f472b6', '#fda4af', '#fce7f3', '#ffffff'], 'sakura', 24);
+    }
+
+    if (ticket) ticket.setAttribute('title', 'Inspect golden ticket nya~ (✿◠‿◠)');
+    if (getxrLogo) getxrLogo.setAttribute('title', 'Inspect GETXR ~desu (* ^ ω ^)');
+    if (threedmaLogo) threedmaLogo.setAttribute('title', 'Inspect 3DMA ~desu (o˘◡˘o)');
+    if (getxrBal) getxrBal.setAttribute('title', 'Click to flip token nya! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧');
+    if (threedmaBal) threedmaBal.setAttribute('title', 'Click to flip token nya! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧');
+
+    // Kaomoji microcopy
+    if (studentInput) studentInput.placeholder = 'e.g. s1234567 (ฅ^•ﻌ•^ฅ)';
+    if (submitBtn) {
+      const span = submitBtn.querySelector('span');
+      if (span) span.textContent = 'Check-nya ✨';
+    }
+
+    // Apply cute anime cat language to all static UI sections
+    updateKawaiiStaticTexts(true);
+
+    // Telemetry & Fanfare
+    if (!wasKawaii) {
+      const { isNew, totalFound } = _unlockTelemetry('0xdm');
+      const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
+      _notifyTelemetry(`✨ Sparkles everywhere! Kawaii Mode unlocked nya! (｡♥‿♥｡) ~desu${suffix}`);
+      if (isSoundEnabled) {
+        SoundEngine.playKawaiiFanfare();
+      }
+    }
+  } else if (isJuicyMode) {
+    document.body.classList.add('juicy-mode');
+    document.body.classList.remove('kawaii-mode');
     document.body.classList.remove('vanilla-mode');
     if (modeIcon) {
       modeIcon.innerHTML = `<svg class="w-3.5 h-3.5 text-amber-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>`;
     }
     if (modeLabel) modeLabel.textContent = 'Juicy';
-    if (toggleBtn) toggleBtn.setAttribute('title', 'Switch to Vanilla mode (calm, instant)');
+    if (toggleBtn) toggleBtn.setAttribute('title', 'Switch to Kawaii mode (pastel dreamscape)');
     if (ticket) ticket.setAttribute('title', 'Inspect golden ticket');
     if (getxrLogo) getxrLogo.setAttribute('title', 'Inspect asset');
     if (threedmaLogo) threedmaLogo.setAttribute('title', 'Inspect asset');
     if (getxrBal) getxrBal.setAttribute('title', 'Click to flip token!');
     if (threedmaBal) threedmaBal.setAttribute('title', 'Click to flip token!');
+
+    // Restore original UI texts & microcopy
+    updateKawaiiStaticTexts(false);
+    if (studentInput && _origPlaceholder) studentInput.placeholder = _origPlaceholder;
+    if (submitBtn && _origSubmitText) {
+      const span = submitBtn.querySelector('span');
+      if (span) span.textContent = _origSubmitText;
+    }
   } else {
+    // Vanilla
+    if (wasJuicy && isSoundEnabled) {
+      SoundEngine.stopVoidCharge(false);
+      SoundEngine.playToggleOff();
+    }
+    isSoundEnabled = false;
+    SoundEngine.suspendCtx();
     document.body.classList.remove('juicy-mode');
+    document.body.classList.remove('kawaii-mode');
     document.body.classList.add('vanilla-mode');
     if (modeIcon) {
       modeIcon.innerHTML = `<svg class="w-3.5 h-3.5 text-slate-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 7 18 0"/><path d="m3 17 18 0"/><path d="m17 5 0 4"/><path d="m7 15 0 4"/></svg>`;
@@ -132,15 +1568,33 @@ function setMode(juicy, updateUrl = true) {
       card3dma.style.transform = '';
       card3dma.classList.remove('tilt-card-reset');
     }
+
+    // Restore original UI texts & microcopy
+    updateKawaiiStaticTexts(false);
+    if (studentInput && _origPlaceholder) studentInput.placeholder = _origPlaceholder;
+    if (submitBtn && _origSubmitText) {
+      const span = submitBtn.querySelector('span');
+      if (span) span.textContent = _origSubmitText;
+    }
   }
+
+  // Update sound toggle button visibility & state
+  updateSoundUI();
 
   // Update telemetry discovery counter visibility and content
   _updateTelemetryUI();
 
   // Preserve mode in URL hash if student record is visible
   if (updateUrl && currentStudentId) {
-    const hashStr = isJuicyMode ? currentStudentId : `${currentStudentId}?vanilla`;
-    history.replaceState(null, '', window.location.pathname + '#' + hashStr);
+    let modeSuffix = '';
+    if (isKawaiiMode) modeSuffix = '?kawaii';
+    else if (!isJuicyMode) modeSuffix = '?vanilla';
+    history.replaceState(null, '', window.location.pathname + '#' + currentStudentId + modeSuffix);
+  }
+
+  // If results are currently showing, re-render cards to reflect mode styles
+  if (currentStudentId && document.getElementById('resultsContainer') && !document.getElementById('resultsContainer').classList.contains('hidden')) {
+    performLookup(currentStudentId, false);
   }
 }
 
@@ -148,13 +1602,23 @@ function setMode(juicy, updateUrl = true) {
 // Canvas Particle System
 // ==========================================================================
 
+let resizeRafId = null;
+
 function initCanvas() {
   canvas = document.getElementById('fxCanvas');
   if (canvas) {
     ctx = canvas.getContext('2d');
     resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('resize', handleWindowResize, { passive: true });
   }
+}
+
+function handleWindowResize() {
+  if (resizeRafId) return;
+  resizeRafId = requestAnimationFrame(() => {
+    resizeRafId = null;
+    resizeCanvas();
+  });
 }
 
 function resizeCanvas() {
@@ -201,13 +1665,20 @@ function spawnBurstAtElement(element, colorPalette, shape = 'circle', count = 22
     particles.push(createParticle(centerX, centerY, colorPalette, shape));
   }
 
-  if (!animFrameId) {
+  if (!animFrameId && !document.hidden) {
     animateParticles();
   }
 }
 
 function animateParticles() {
-  if (!ctx || particles.length === 0) {
+  if (document.hidden) {
+    animFrameId = null;
+    return;
+  }
+
+  const shouldRunKawaiiAmbient = isKawaiiMode && canvas && !isInTheVoid;
+
+  if (!ctx || (particles.length === 0 && !shouldRunKawaiiAmbient)) {
     if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
     animFrameId = null;
     return;
@@ -221,22 +1692,26 @@ function animateParticles() {
     p.y += p.vy;
     p.vy += p.gravity !== undefined ? p.gravity : 0.2;
     p.vx *= p.drag !== undefined ? p.drag : 0.98;
-    p.alpha -= p.decay;
-    p.rotation += p.rotSpeed;
+    p.alpha -= (p.decay !== undefined ? p.decay : 0.03);
+    p.rotSpeed = p.rotSpeed || 0;
+    p.rotation = (p.rotation || 0) + p.rotSpeed;
     if (p.tilt !== undefined) {
+      p.tiltSpeed = p.tiltSpeed || 0;
       p.tilt += p.tiltSpeed;
     }
 
-    if (p.alpha <= 0 || p.y > canvas.height + 60) {
+    if (isNaN(p.alpha) || isNaN(p.x) || isNaN(p.y) || p.alpha <= 0 || p.y > canvas.height + 60) {
       // Fast O(1) swap-and-pop removal avoids shifting remaining array elements
       particles[i] = particles[particles.length - 1];
       particles.pop();
       continue;
     }
 
+    const safeAlpha = Math.max(0, Math.min(1, p.alpha));
+
     if (p.shape === 'rect' || p.shape === 'ribbon') {
       ctx.save();
-      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.globalAlpha = safeAlpha;
       ctx.fillStyle = p.color;
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rotation);
@@ -246,7 +1721,7 @@ function animateParticles() {
       ctx.restore();
     } else if (p.shape === 'diamond') {
       ctx.save();
-      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.globalAlpha = safeAlpha;
       ctx.fillStyle = p.color;
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rotation);
@@ -258,9 +1733,34 @@ function animateParticles() {
       ctx.closePath();
       ctx.fill();
       ctx.restore();
+    } else if (p.shape === 'sakura') {
+      ctx.save();
+      ctx.globalAlpha = safeAlpha;
+      ctx.fillStyle = p.color;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation);
+      ctx.beginPath();
+      ctx.moveTo(0, -p.size);
+      ctx.bezierCurveTo(p.size * 0.85, -p.size * 0.85, p.size * 0.85, p.size * 0.6, 0, p.size);
+      ctx.bezierCurveTo(-p.size * 0.85, p.size * 0.6, -p.size * 0.85, -p.size * 0.85, 0, -p.size);
+      ctx.fill();
+      ctx.restore();
+    } else if (p.shape === 'heart') {
+      ctx.save();
+      ctx.globalAlpha = safeAlpha;
+      ctx.fillStyle = p.color;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation);
+      const d = p.size * 0.65;
+      ctx.beginPath();
+      ctx.moveTo(0, d * 0.3);
+      ctx.bezierCurveTo(-d, -d * 0.6, -d * 1.5, d * 0.6, 0, d * 1.4);
+      ctx.bezierCurveTo(d * 1.5, d * 0.6, d, -d * 0.6, 0, d * 0.3);
+      ctx.fill();
+      ctx.restore();
     } else {
       // Circles are rotationally invariant: draw directly without matrix transform overhead
-      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.globalAlpha = safeAlpha;
       ctx.fillStyle = p.color;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size / 2, 0, Math.PI * 2);
@@ -268,7 +1768,59 @@ function animateParticles() {
     }
   }
 
-  animFrameId = requestAnimationFrame(animateParticles);
+  // Ambient gentle sakura & heart drift in Kawaii Mode (capped at 14 particles, paused in The Void or when backgrounded)
+  if (shouldRunKawaiiAmbient) {
+    if (particles.length < 14 && Math.random() < 0.08) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: -15,
+        vx: (Math.random() - 0.4) * 1.1,
+        vy: 0.7 + Math.random() * 1.0,
+        size: 5 + Math.random() * 5,
+        color: ['#fbcfe8', '#f472b6', '#fda4af', '#fce7f3', '#ffffff'][Math.floor(Math.random() * 5)],
+        alpha: 0.85,
+        decay: 0.0035,
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.03,
+        shape: Math.random() > 0.35 ? 'sakura' : 'heart',
+        gravity: 0.012,
+        drag: 0.99
+      });
+    }
+  }
+
+  if (particles.length > 0 || shouldRunKawaiiAmbient) {
+    animFrameId = requestAnimationFrame(animateParticles);
+  } else {
+    animFrameId = null;
+  }
+}
+
+function spawnKawaiiHeartPuff() {
+  if (!canvas || !ctx || !isJuicyMode) return;
+  const cx = window.innerWidth / 2;
+  const cy = window.innerHeight * 0.76;
+  const colors = ['#f472b6', '#ec4899', '#fbcfe8', '#ffffff', '#c084fc'];
+  for (let i = 0; i < 9; i++) {
+    const angle = Math.PI * 0.5 + (Math.random() - 0.5) * 0.9;
+    const speed = 2.5 + Math.random() * 4.5;
+    particles.push({
+      x: cx + (Math.random() - 0.5) * 60,
+      y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed * 0.5 - 2.5,
+      size: 4 + Math.random() * 4,
+      color: colors[i % colors.length],
+      alpha: 1.0,
+      decay: 0.025,
+      rotation: Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random() - 0.5) * 0.15,
+      shape: 'heart',
+      gravity: 0.08,
+      drag: 0.98
+    });
+  }
+  if (!animFrameId) animateParticles();
 }
 
 // ==========================================================================
@@ -285,6 +1837,7 @@ function animateCounter(element, targetVal) {
   const duration = 600;
   const startTime = performance.now();
   const startVal = 0.0;
+  let lastTickTime = 0;
 
   function step(now) {
     const elapsed = now - startTime;
@@ -293,6 +1846,11 @@ function animateCounter(element, targetVal) {
     const current = startVal + (targetVal - startVal) * ease;
     element.textContent = current.toFixed(1);
 
+    if (targetVal > 0 && now - lastTickTime >= 58 && progress < 0.95) {
+      lastTickTime = now;
+      SoundEngine.playCounterTick(progress);
+    }
+
     if (progress < 1) {
       requestAnimationFrame(step);
     } else {
@@ -300,6 +1858,7 @@ function animateCounter(element, targetVal) {
       element.classList.remove('pop-number');
       void element.offsetWidth;
       element.classList.add('pop-number');
+      SoundEngine.playCounterPop(targetVal);
     }
   }
   requestAnimationFrame(step);
@@ -313,6 +1872,9 @@ function showAlert(message, type = 'error') {
     : 'mt-3 p-3.5 rounded-lg text-xs font-medium border bg-blue-50 border-blue-200 text-blue-800 shadow-2xs';
   alertBox.textContent = message;
   alertBox.classList.remove('hidden');
+  if (type === 'error') {
+    SoundEngine.playErrorAlert();
+  }
 }
 
 function hideAlert() {
@@ -335,13 +1897,18 @@ function createTransactionRow(tx, index = 0) {
   row.className = `flex items-center justify-between py-1 px-2 rounded bg-slate-50/80 border border-slate-200/70 text-[11px] ${isJuicyMode ? 'ledger-item' : ''}`;
   if (isJuicyMode) {
     row.style.setProperty('--item-idx', index);
+    SoundEngine.playLedgerDeal(index);
   }
 
   const deltaVal = Number(tx.delta !== undefined ? tx.delta : 0);
   const isPositive = deltaVal > 0;
   const deltaColor = tx.type === 'BASE' ? 'text-slate-500' : (isPositive ? 'text-emerald-700' : 'text-rose-700');
   const deltaSign = isPositive && tx.type !== 'BASE' ? '+' : '';
-  const reasonText = escapeHtml(tx.reason || tx.type || '');
+  let rawReason = tx.reason || tx.type || '';
+  if (isKawaiiMode) {
+    rawReason = cutifyLedgerReason(rawReason);
+  }
+  const reasonText = escapeHtml(rawReason);
   const dateText = escapeHtml(tx.date || '');
 
   row.innerHTML = `
@@ -375,18 +1942,23 @@ function renderCourseCard(courseKey, data) {
   if (!data || !data.enrolled) {
     if (badge) {
       badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600 border border-slate-200 shrink-0';
-      badge.innerHTML = isJuicyMode
-        ? `<svg class="w-3 h-3 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg><span>Not Enrolled</span>`
-        : '<span>Not Enrolled</span>';
-      badge.title = 'Not enrolled in this course.';
+      const label = isKawaiiMode ? 'Not Enrolled nya... (T_T)' : 'Not Enrolled';
+      badge.innerHTML = (isJuicyMode || isKawaiiMode)
+        ? `<svg class="w-3 h-3 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg><span>${label}</span>`
+        : `<span>${label}</span>`;
+      badge.title = isKawaiiMode ? 'Not enrolled in this course ~desu.' : 'Not enrolled in this course.';
     }
 
-    if (notEnrolledEl) notEnrolledEl.classList.remove('hidden');
+    if (notEnrolledEl) {
+      notEnrolledEl.classList.remove('hidden');
+      const pBold = notEnrolledEl.querySelector('p.font-semibold');
+      if (pBold) pBold.textContent = isKawaiiMode ? 'Not Enrolled nya... (T_T)' : 'Not Enrolled';
+    }
     if (enrolledContentEl) enrolledContentEl.classList.add('hidden');
     if (ledgerSectionEl) ledgerSectionEl.classList.add('hidden');
 
     if (reasonEl && data?.reason) {
-      reasonEl.textContent = data.reason;
+      reasonEl.textContent = isKawaiiMode ? `${data.reason} ~desu.` : data.reason;
     }
     return;
   }
@@ -400,9 +1972,33 @@ function renderCourseCard(courseKey, data) {
   const earned = data.earned || 0.0;
   const spent = data.spent || 0.0;
 
-  // Single unified status badge with crisp Lucide vector micro-SVGs (never wraps course title)
+  // Single unified status badge with crisp Lucide vector micro-SVGs
   if (badge) {
-    if (isJuicyMode) {
+    if (isKawaiiMode) {
+      if (balance >= 3.0) {
+        badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-pink-100 text-pink-800 border border-pink-300 shrink-0';
+        badge.innerHTML = `<svg class="w-3 h-3 text-pink-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>Stockpiler-nya! 👑</span>`;
+        badge.title = 'Vault reserve ≥ 3.0 tokens nya! Super prepared ~desu! (✿◠‿◠)';
+        if (cardEl) cardEl.classList.add(isGetxr ? 'aura-glow-gold' : 'aura-glow-indigo');
+      } else if (earned > 0.0) {
+        badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0';
+        badge.innerHTML = `<svg class="w-3 h-3 text-emerald-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg><span>Prepared-nya! 🌸</span>`;
+        badge.title = 'Attendance credits banked nya! Inventory bolstered ~desu!';
+        if (balance >= 2.5 && cardEl) {
+          cardEl.classList.add(isGetxr ? 'aura-glow-gold' : 'aura-glow-indigo');
+        }
+      } else if (spent > 0.0) {
+        badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-purple-50 text-purple-700 border border-purple-200 shrink-0';
+        badge.innerHTML = `<svg class="w-3 h-3 text-purple-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span>Extended-nya! ⏰</span>`;
+        badge.title = 'Late tokens deployed nya! Taking extra time ~desu!';
+      } else {
+        badge.className = isGetxr 
+          ? 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-medium bg-pink-50 text-pink-700 border border-pink-200 shrink-0'
+          : 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-medium bg-purple-50 text-purple-700 border border-purple-200 shrink-0';
+        badge.innerHTML = `<svg class="w-3 h-3 text-pink-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg><span>Enrolled ~desu! ✨</span>`;
+        badge.title = 'Base tokens primed nya!';
+      }
+    } else if (isJuicyMode) {
       if (balance >= 3.0) {
         badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-800 border border-amber-300 shrink-0';
         badge.innerHTML = `<svg class="w-3 h-3 text-amber-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>Stockpiler</span>`;
@@ -433,6 +2029,27 @@ function renderCourseCard(courseKey, data) {
     }
   }
 
+  // Update card balance title and stats labels
+  if (cardEl) {
+    const availHeading = cardEl.querySelector('.bg-slate-50\\/80 span.text-\\[10px\\]');
+    if (availHeading) {
+      availHeading.textContent = isKawaiiMode ? 'Available Late Tokens ~desu 🐾' : 'Available Late Tokens';
+    }
+    const statCols = cardEl.querySelectorAll('.grid-cols-3 > div > span:first-child');
+    if (statCols && statCols.length === 3) {
+      statCols[0].textContent = isKawaiiMode ? 'Base ~desu' : 'Base';
+      statCols[1].textContent = isKawaiiMode ? 'Earned nya✨' : 'Earned';
+      statCols[2].textContent = isKawaiiMode ? 'Spent nya' : 'Spent';
+    }
+    const historyHeader = cardEl.querySelector('#' + prefix + 'LedgerSection h4');
+    if (historyHeader) {
+      const span1 = historyHeader.querySelector('span:first-child');
+      const span2 = historyHeader.querySelector('span:last-child');
+      if (span1) span1.textContent = isKawaiiMode ? 'Activity History-nya 📜' : 'Activity History';
+      if (span2) span2.textContent = isKawaiiMode ? '(Newest first ~desu)' : '(Newest first)';
+    }
+  }
+
   const balanceEl = document.getElementById(`${prefix}Balance`);
   animateCounter(balanceEl, balance);
 
@@ -443,7 +2060,9 @@ function renderCourseCard(courseKey, data) {
   // Render transactions (reversed for newest first) with optional stagger
   const transactions = (data.transactions || []).slice().reverse();
   if (transactions.length === 0) {
-    ledger.innerHTML = '<div class="text-[11px] text-slate-500 py-1">No transaction history yet.</div>';
+    ledger.innerHTML = isKawaiiMode
+      ? '<div class="text-[11px] text-pink-600 py-1">No transaction history yet nya~ (・ω・)</div>'
+      : '<div class="text-[11px] text-slate-500 py-1">No transaction history yet.</div>';
   } else {
     transactions.forEach((tx, idx) => ledger.appendChild(createTransactionRow(tx, idx)));
   }
@@ -495,7 +2114,9 @@ async function performLookup(rawId, updateUrl = true) {
   const resultsContainer = document.getElementById('resultsContainer');
 
   if (!rawId) {
-    showAlert('Please enter your student number (e.g. 1234567 or s1234567).');
+    showAlert(isKawaiiMode
+      ? 'Please enter your student number nya~ (e.g. s1234567) desu! (ฅ^•ﻌ•^ฅ)'
+      : 'Please enter your student number (e.g. 1234567 or s1234567).');
     inputEl.focus();
     return;
   }
@@ -530,9 +2151,13 @@ async function performLookup(rawId, updateUrl = true) {
 
     if (!res.ok) {
       if (res.status === 404) {
-        throw new Error(`Student number "${studentId}" was not found in the course roster. Please double-check the number or contact your instructor.`);
+        throw new Error(isKawaiiMode
+          ? `Student number "${studentId}" was not found in the roster nya... (T_T) Please double-check or ask sensei ~desu!`
+          : `Student number "${studentId}" was not found in the course roster. Please double-check the number or contact your instructor.`);
       }
-      throw new Error(`Error loading record (${res.status}). Please try again.`);
+      throw new Error(isKawaiiMode
+        ? `Error loading record (${res.status}) nya... Please try again ~desu!`
+        : `Error loading record (${res.status}). Please try again.`);
     }
 
     const data = await res.json();
@@ -548,10 +2173,12 @@ async function performLookup(rawId, updateUrl = true) {
 
     // Update URL hash for bookmarking and browser title
     if (updateUrl) {
-      const hashStr = isJuicyMode ? studentId : `${studentId}?vanilla`;
-      history.replaceState(null, '', window.location.pathname + '#' + hashStr);
+      let modeSuffix = '';
+      if (isKawaiiMode) modeSuffix = '?kawaii';
+      else if (!isJuicyMode) modeSuffix = '?vanilla';
+      history.replaceState(null, '', window.location.pathname + '#' + studentId + modeSuffix);
     }
-    document.title = `IM 2026 Tokens — ${studentId}`;
+    document.title = isKawaiiMode ? `IM 2026 Tokens — ${studentId} ~desu ✨` : `IM 2026 Tokens — ${studentId}`;
 
     resultsContainer.classList.remove('hidden');
     if (window.innerWidth < 768) {
@@ -562,11 +2189,11 @@ async function performLookup(rawId, updateUrl = true) {
   } catch (err) {
     currentStudentId = '';
     resultsContainer.classList.add('hidden');
-    document.title = 'IM 2026 Token Lookup';
+    document.title = isKawaiiMode ? 'IM 2026 Token Lookup ~desu! (✿◠‿◠)' : 'IM 2026 Token Lookup';
     const isNetworkError = err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError');
     const msg = isNetworkError 
-      ? 'Unable to connect to the server. Please check your internet connection and try again.'
-      : (err.message || 'An unexpected error occurred.');
+      ? (isKawaiiMode ? 'Cannot reach server-nya! Please check your internet connection desu (´-ω-｀)' : 'Unable to connect to the server. Please check your internet connection and try again.')
+      : (err.message || (isKawaiiMode ? 'An unexpected error occurred nya...' : 'An unexpected error occurred.'));
     showAlert(msg);
   } finally {
     submitBtn.disabled = false;
@@ -578,6 +2205,7 @@ async function performLookup(rawId, updateUrl = true) {
 // Form Submission Handler
 function handleFormSubmit(e) {
   e.preventDefault();
+  SoundEngine.playLookupClick();
   const inputEl = document.getElementById('studentIdInput');
   const rawId = inputEl.value.trim();
   const lower = rawId.toLowerCase();
@@ -595,6 +2223,22 @@ function handleFormSubmit(e) {
     inputEl.value = '';
     inputEl.blur();
     _execManeuver();
+    return;
+  }
+
+  // Gravity Mode trigger (matches 'gravity' or 'google gravity' in Juicy mode)
+  if (isJuicyMode && (lower === 'gravity' || lower === 'google gravity')) {
+    inputEl.value = '';
+    inputEl.blur();
+    triggerGravityMode();
+    return;
+  }
+
+  // Kawaii Mode trigger (matches 'kawaii', 'uwu', 'nya')
+  if (lower === 'kawaii' || lower === 'uwu' || lower === 'nya') {
+    inputEl.value = '';
+    inputEl.blur();
+    setMode('kawaii', true);
     return;
   }
 
@@ -622,7 +2266,7 @@ function handleClearSearch() {
 
 const _K_STORE = atob('aW1fdG9rZW5zX2Rpc2NvdmVyZWRfZWdncw==');
 
-// Subsystem telemetry manifest (10 secrets)
+// Subsystem telemetry manifest (13 secrets)
 const _0xM = [
   { id: '0x1a', name: atob('VG9rZW4gQ29pbiBGbGlw') },       // Token Coin Flip
   { id: '0x2b', name: atob('RG8gYSBCYXJyZWwgUm9sbA==') },   // Do a Barrel Roll
@@ -633,13 +2277,29 @@ const _0xM = [
   { id: '0x7g', name: atob('VGhlIFZvaWQ=') },               // The Void
   { id: '0x8h', name: atob('VGhlIEVhc3RlciBFZ2c=') },       // The Easter Egg
   { id: '0x9i', name: atob('VG9rZW4gT3ZlcmNsb2Nr') },      // Token Overclock
-  { id: '0xaj', name: atob('R3VhcmRpYW4ncyBCbGVzc2luZw==') } // Guardian's Blessing
+  { id: '0xaj', name: atob('R3VhcmRpYW4ncyBCbGVzc2luZw==') }, // Guardian's Blessing
+  { id: '0xbk', name: atob('T3JiaXRhbCBBc2NlbnQ=') },       // Orbital Ascent
+  { id: '0xcl', name: atob('R3Jhdml0eSBNb2Rl') },           // Gravity Mode
+  { id: '0xdm', name: atob('S2F3YWlpIE1vZGU=') }            // Kawaii Mode
 ];
 
 function _getDiscoveredTelemetry() {
   try {
     const raw = localStorage.getItem(_K_STORE);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return new Set();
+
+    // Validate strictly against active manifest IDs to automatically purge retired/legacy secrets
+    const validIds = new Set(_0xM.map(m => m.id));
+    const sanitized = arr.filter(id => validIds.has(id));
+
+    if (sanitized.length !== arr.length) {
+      try {
+        localStorage.setItem(_K_STORE, JSON.stringify(sanitized));
+      } catch (e) {}
+    }
+    return new Set(sanitized);
   } catch (e) {
     return new Set();
   }
@@ -658,6 +2318,9 @@ function _unlockTelemetry(tag) {
     try {
       localStorage.setItem(_K_STORE, JSON.stringify([...discovered]));
     } catch (e) {}
+    if (tag !== '0xdm') {
+      SoundEngine.playSecretUnlock(discovered.size === _0xM.length, 0.18);
+    }
   }
 
   _updateTelemetryUI();
@@ -670,7 +2333,8 @@ function _clearDiscoveredTelemetry() {
   } catch (e) {}
   _updateTelemetryUI();
   if (isJuicyMode) {
-    _notifyTelemetry(atob('U2VjcmV0cyBjb3VudGVyIHJlc2V0OiAwLzEw'));
+    SoundEngine.playTelemetryReset();
+    _notifyTelemetry(atob('U2VjcmV0cyBjb3VudGVyIHJlc2V0OiAwLzEy'));
   }
 }
 
@@ -690,7 +2354,7 @@ function _updateTelemetryUI() {
   const total = _0xM.length;
 
   const easterEgg3D = document.getElementById('easterEgg3D');
-  if (easterEgg3D) {
+  if (easterEgg3D && !document.body.classList.contains('in-the-void')) {
     if (discovered.has('0x8h')) {
       easterEgg3D.classList.add('claimed');
     } else {
@@ -724,27 +2388,50 @@ function _updateTelemetryUI() {
         avatar.classList.add('logo-bobble');
       }
 
+      SoundEngine.playSecretUnlock(true, 0);
       _dispenseCelebrationParticles();
       _notifyTelemetry(atob('QWNoaWV2ZW1lbnQ6IE1hc3RlciBvZiBTZWNyZXRzISBBbGwgc2VjcmV0cyB1bmxvY2tlZC4='));
     };
   } else {
     container.className = count > 0
-      ? 'inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-mono bg-slate-100 text-slate-700 border border-slate-300 transition-all select-none shadow-2xs cursor-default'
-      : 'inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-mono bg-slate-100/90 text-slate-500 border border-slate-200 transition-all select-none shadow-2xs cursor-default';
+      ? 'inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-mono bg-slate-100 text-slate-700 border border-slate-300 transition-all select-none shadow-2xs cursor-pointer hover:bg-slate-200/70'
+      : 'inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-[11px] font-mono bg-slate-100/90 text-slate-500 border border-slate-200 transition-all select-none shadow-2xs cursor-pointer hover:bg-slate-200/50';
+    const counterLabel = isKawaiiMode 
+      ? `Secrets discovered nya: ${count}/${total} ✨` 
+      : `Secrets discovered: ${count}/${total}`;
+    const counterTooltip = isKawaiiMode
+      ? `Secrets discovered nya: ${count}/${total} — Explore to find all ${total} ~desu! (Shift+click to reset)`
+      : `Secrets discovered: ${count}/${total} — Explore the page to find all ${total}! (Shift+click to reset)`;
     container.innerHTML = `
       <svg class="w-3.5 h-3.5 text-amber-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
       </svg>
-      <span id="eggCounterText">Secrets discovered: ${count}/${total}</span>
+      <span id="eggCounterText">${counterLabel}</span>
     `;
-    container.onclick = null;
-    container.removeAttribute('title');
+    container.setAttribute('title', counterTooltip);
+    container.onclick = (e) => {
+      if (!isJuicyMode) return;
+      if (e.shiftKey) {
+        _clearDiscoveredTelemetry();
+        return;
+      }
+      container.classList.remove('badge-celebrate');
+      void container.offsetWidth;
+      container.classList.add('badge-celebrate');
+      SoundEngine.playTelemetryPing(count, total);
+      spawnBurstAtElement(container, ['#f59e0b', '#fbbf24', '#fde047', '#3b82f6'], 'circle', 10);
+    };
   }
 }
+
+// Expose dev/user helper to reset secrets
+window.resetSecrets = _clearDiscoveredTelemetry;
 
 // 1. Angular Maneuver Routine
 function _execManeuver() {
   if (!isJuicyMode) return;
+
+  SoundEngine.playBarrelRoll();
 
   const container = document.getElementById('mainContainer') || document.querySelector('main') || document.body;
   container.classList.remove('barrel-rolling');
@@ -947,7 +2634,12 @@ function _setupKListener() {
 
     if (sig && sig === expected) {
       _kPos++;
-      if (_kPos === _SIG.length) {
+      if (_kPos < _SIG.length) {
+        // Play ascending retro step blip once sequence is underway (>= 2nd key)
+        if (_kPos >= 2) {
+          SoundEngine.playKonamiStep(_kPos - 1);
+        }
+      } else if (_kPos === _SIG.length) {
         _kPos = 0;
         e.preventDefault();
 
@@ -959,6 +2651,8 @@ function _setupKListener() {
           }
           inputEl.blur();
         }
+
+        SoundEngine.playKonamiCode();
 
         const { isNew, totalFound } = _unlockTelemetry('0x3c');
         const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
@@ -985,6 +2679,8 @@ function _setupFlipListener() {
       if (isOverclocking || !isJuicyMode) return;
       isOverclocking = true;
 
+      SoundEngine.playOverclockStart();
+
       const trueVal = el.getAttribute('data-true-val') || el.textContent.trim();
       el.setAttribute('data-true-val', trueVal);
 
@@ -994,12 +2690,19 @@ function _setupFlipListener() {
       const fakeVals = ['7.7', '9.9', '0.0', '13.37', '42.0', '99.9', '8.5', '3.14', '77.7', '999.0', '404.0'];
       const startTime = performance.now();
       const duration = 1400; // 1.4s of slot machine spinning
+      let lastReelSoundTime = 0;
 
       function spinReel() {
-        const elapsed = performance.now() - startTime;
+        const now = performance.now();
+        const elapsed = now - startTime;
         if (elapsed < duration) {
           const rndVal = fakeVals[Math.floor(Math.random() * fakeVals.length)];
           el.textContent = rndVal;
+
+          if (now - lastReelSoundTime >= 68) {
+            lastReelSoundTime = now;
+            SoundEngine.playOverclockTick(elapsed / duration);
+          }
 
           // Emit small sparks during overclock
           if (Math.random() > 0.4) {
@@ -1013,6 +2716,8 @@ function _setupFlipListener() {
           el.textContent = el.getAttribute('data-true-val') || trueVal;
           void el.offsetWidth;
           el.classList.add('pop-number');
+
+          SoundEngine.playOverclockJackpot();
 
           // Huge golden celebration particle blast!
           _dispenseCelebrationParticles();
@@ -1078,10 +2783,18 @@ function _setupFlipListener() {
       }, 700);
 
       const isGetxr = id.startsWith('getxr');
-      const colors = isGetxr 
-        ? ['#f59e0b', '#fbbf24', '#fde047', '#eab308'] 
-        : ['#818cf8', '#a855f7', '#c084fc', '#6366f1'];
-      const shape = isGetxr ? 'circle' : 'diamond';
+      if (isKawaiiMode) {
+        SoundEngine.playKawaiiBoing();
+      } else {
+        SoundEngine.playCoinFlip(isGetxr);
+      }
+
+      const colors = isKawaiiMode
+        ? ['#f472b6', '#ec4899', '#fbcfe8', '#fda4af', '#ffffff']
+        : (isGetxr 
+          ? ['#f59e0b', '#fbbf24', '#fde047', '#eab308'] 
+          : ['#818cf8', '#a855f7', '#c084fc', '#6366f1']);
+      const shape = isKawaiiMode ? (Math.random() > 0.5 ? 'heart' : 'sakura') : (isGetxr ? 'circle' : 'diamond');
       spawnBurstAtElement(el, colors, shape, 14);
 
       const { isNew, totalFound } = _unlockTelemetry('0x1a');
@@ -1098,6 +2811,8 @@ function _setupTicketListener() {
 
   ticket.addEventListener('click', () => {
     if (!isJuicyMode) return;
+
+    SoundEngine.playTicketSpin();
 
     ticket.classList.remove('ticket-spin');
     void ticket.offsetWidth;
@@ -1126,6 +2841,8 @@ function _setupLogoListener() {
 
     logo.addEventListener('click', () => {
       if (!isJuicyMode) return;
+
+      SoundEngine.playLogoBobble(isGetxr);
 
       logo.classList.remove('logo-bobble');
       void logo.offsetWidth;
@@ -1180,6 +2897,8 @@ function _setupGuardianCatListener() {
       return '🐱 *tail flick*';
     }
 
+    SoundEngine.playCatPurr();
+
     const { isNew, totalFound } = _unlockTelemetry('0xaj');
     const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
     _notifyTelemetry(`Guardian Cat purrs happily!${suffix}`);
@@ -1200,6 +2919,7 @@ function _setupGuardianCatListener() {
   window.pet = window.petCat;
   window.cat = window.petCat;
   window.guardianCat = { pet: window.petCat };
+  window.guardianCat.toString = () => { window.petCat(); return '🐱 *happy purr*'; };
   window.petCat.pet = window.petCat;
   window.petCat.toString = () => { window.petCat(); return '🐱 *happy purr*'; };
 }
@@ -1257,6 +2977,7 @@ function setupCardDrag() {
       e.preventDefault(); // Stop native text selection or ghost drag
 
       let isDraggingThis = false;
+      let wasTowardsOther = false;
       const startX = e.clientX;
       const startY = e.clientY;
 
@@ -1271,6 +2992,7 @@ function setupCardDrag() {
         if (!isDraggingThis) {
           if (dist < 5) return;
           isDraggingThis = true;
+          SoundEngine.playCardPickup();
           card.classList.add('card-dragging');
           card.classList.remove('tilt-card-reset');
           card.style.setProperty('pointer-events', 'none');
@@ -1290,12 +3012,17 @@ function setupCardDrag() {
         const towardsOther = isFirst ? (primaryDelta > 50) : (primaryDelta < -50);
 
         if (towardsOther) {
+          if (!wasTowardsOther) {
+            wasTowardsOther = true;
+            SoundEngine.playCardNudge();
+          }
           const nudge = isFirst ? -16 : 16;
           otherCard.style.setProperty('transition', 'transform 0.2s cubic-bezier(0.25, 1, 0.5, 1)', 'important');
           otherCard.style.setProperty('transform', isHorizontal 
             ? `translateX(${nudge}px) scale(0.98)` 
             : `translateY(${nudge}px) scale(0.98)`, 'important');
         } else {
+          wasTowardsOther = false;
           otherCard.style.setProperty('transition', 'transform 0.2s ease-out', 'important');
           otherCard.style.removeProperty('transform');
         }
@@ -1322,6 +3049,7 @@ function setupCardDrag() {
           _executeCardSwap(card, otherCard, dx, dy);
         } else {
           // Spring bounce back to original position
+          SoundEngine.playCardSettle();
           card.classList.remove('card-dragging');
           card.style.setProperty('transition', 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease', 'important');
           card.style.setProperty('transform', 'translate3d(0, 0, 0) scale(1)', 'important');
@@ -1385,6 +3113,8 @@ function _dispenseBehindCardConfetti(cardA, cardB) {
 function _executeCardSwap(cardA, cardB, currentDx, currentDy) {
   const grid = document.getElementById('courseCardsGrid');
   if (!grid) return;
+
+  SoundEngine.playCardSwap();
 
   // Measure initial geometry before DOM change
   const rectA = cardA.getBoundingClientRect();
@@ -1476,7 +3206,15 @@ function setupCardTilt() {
 
     card.addEventListener('mouseenter', () => {
       if (!isJuicyMode || window.innerWidth < 768) return;
+      card.style.willChange = 'transform';
       updateRect();
+      if (isKawaiiMode) {
+        if (Math.random() < 0.6) {
+          SoundEngine.playKawaiiMeow();
+        } else {
+          SoundEngine.playKawaiiPurr();
+        }
+      }
     });
 
     card.addEventListener('mousemove', (e) => {
@@ -1498,10 +3236,11 @@ function setupCardTilt() {
           glint.style.setProperty('--glint-y', `${((targetY + 0.5) * 100).toFixed(1)}%`);
         });
       }
-    });
+    }, { passive: true });
 
     card.addEventListener('mouseleave', () => {
       rect = null;
+      card.style.willChange = '';
       if (tiltRafId) {
         cancelAnimationFrame(tiltRafId);
         tiltRafId = null;
@@ -1522,12 +3261,38 @@ function init3DVoidModule() {
   const worldRig = document.getElementById('worldRig');
   const returnBtn = document.getElementById('returnToScreenBtn');
   const easterEgg3D = document.getElementById('easterEgg3D');
+  const voidFloor = document.getElementById('voidFloor');
+  const floorShadow = document.getElementById('floorShadow');
+  const voidAltimeter = document.getElementById('voidAltimeter');
+  const altimeterZone = document.getElementById('altimeterZone');
+  const altimeterValue = document.getElementById('altimeterValue');
+  const altimeterClimbArrow = document.getElementById('altimeterClimbArrow');
+  const altimeterGaugeFill = document.getElementById('altimeterGaugeFill');
+  const voidStarfield = document.getElementById('voidStarfield');
+  const voidCloudContainer = document.getElementById('voidCloudContainer');
+  const cosmicCat3D = document.getElementById('cosmicCat3D');
   if (!worldRig) return;
+
+  // Initialize starry cosmos background (85 twinkling stars)
+  if (voidStarfield && voidStarfield.children.length === 0) {
+    for (let i = 0; i < 85; i++) {
+      const star = document.createElement('div');
+      star.className = 'cosmic-star';
+      const size = 1.0 + Math.random() * 2.2;
+      star.style.width = `${size.toFixed(1)}px`;
+      star.style.height = `${size.toFixed(1)}px`;
+      star.style.left = `${(Math.random() * 100).toFixed(1)}%`;
+      star.style.top = `${(Math.random() * 100).toFixed(1)}%`;
+      star.style.setProperty('--twinkle-dur', `${(2.0 + Math.random() * 3.5).toFixed(1)}s`);
+      star.style.animationDelay = `${(Math.random() * 3).toFixed(1)}s`;
+      voidStarfield.appendChild(star);
+    }
+  }
 
   let isHoldingKey = false;
   let holdStartTime = 0;
   let shakeRafId = null;
-  let isInTheVoid = false;
+  isInTheVoid = false;
 
   // First-person camera & world coordinates
   let camX = 0;
@@ -1537,6 +3302,14 @@ function init3DVoidModule() {
   let camYaw = -16;
   let camPitch = 8;
   let gameLoopRafId = null;
+  let lastFootstepTime = 0;
+
+  // Atmospheric flight & ascent tracking
+  let justPressedJump = false;
+  let maxAltitudeReached = 0;
+  let hasEnteredOrbitSoundPlayed = false;
+  let lastReentryParticleTime = 0;
+  let lastThrusterPuffTime = 0;
 
   const activeKeys = {};
 
@@ -1566,6 +3339,7 @@ function init3DVoidModule() {
     worldRig.style.transition = 'none';
     const pageCard = document.getElementById('pageCard');
     cachedCardRect = pageCard ? pageCard.getBoundingClientRect() : null;
+    SoundEngine.startVoidCharge();
     spawnPressDownImpact();
     updateShake();
   }
@@ -1574,6 +3348,7 @@ function init3DVoidModule() {
     cachedCardRect = null;
     if (!isHoldingKey || isInTheVoid) return;
     isHoldingKey = false;
+    SoundEngine.stopVoidCharge(true);
     if (shakeRafId) {
       cancelAnimationFrame(shakeRafId);
       shakeRafId = null;
@@ -1756,6 +3531,8 @@ function init3DVoidModule() {
     const progress = Math.min(1.0, elapsed / 3000.0);
 
     if (elapsed < 3000.0) {
+      SoundEngine.updateVoidCharge(progress);
+
       // Immediate base rumble + power curve: 3.5px base + t^1.4 * 22px
       const t = progress;
       const amp = 3.5 + Math.pow(t, 1.4) * 22.0;
@@ -1779,12 +3556,25 @@ function init3DVoidModule() {
     }
   }
 
+  let _kawaiiKeyBuffer = '';
+
   // Window key listeners for hold trigger
   window.addEventListener('keydown', (e) => {
     if (isInTheVoid) {
       activeKeys[e.code] = true;
       activeKeys[e.key] = true;
-      if (e.code === 'Space' || e.key === ' ' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      if (e.code === 'Space' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        if (!e.repeat) {
+          justPressedJump = true;
+        }
+      }
+      if (e.key === 'g' || e.key === 'G') {
+        e.preventDefault();
+        toggleVoidGravityMode();
+        return;
+      }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
       }
       if (e.key === 'Escape') {
@@ -1793,8 +3583,33 @@ function init3DVoidModule() {
       return;
     }
 
+    if (isGravityModeActive) {
+      if (e.key === 'Escape' || e.key === 'g' || e.key === 'G') {
+        e.preventDefault();
+        restoreGravityMode();
+        return;
+      }
+    }
+
     if (isInputFocused()) return; // Never trigger while typing in student number or using buttons
+
+    // Kawaii Mode keyword trigger outside inputs ('kawaii', 'uwu', 'nya')
+    if (e.key && e.key.length === 1) {
+      _kawaiiKeyBuffer = (_kawaiiKeyBuffer + e.key.toLowerCase()).slice(-10);
+      if (_kawaiiKeyBuffer.endsWith('kawaii') || _kawaiiKeyBuffer.endsWith('uwu') || _kawaiiKeyBuffer.endsWith('nya')) {
+        _kawaiiKeyBuffer = '';
+        setMode(isKawaiiMode ? 'juicy' : 'kawaii', true);
+        return;
+      }
+    }
+    if (isGravityModeActive) return; // Do not trigger void hold while in gravity mode
+    if (e.key === 'g' || e.key === 'G') {
+      e.preventDefault();
+      triggerGravityMode();
+      return;
+    }
     if (!isTargetKey(e.key, e.code)) return;
+    if (_kPos >= 2) return; // Do not start Void hold while user is actively entering Konami Code
 
     e.preventDefault(); // Prevent page scroll during hold trigger
     if (e.repeat) return; // Prevent OS key-repeat from restarting timer
@@ -1817,7 +3632,21 @@ function init3DVoidModule() {
   // Window blur / tab switch safeguard
   window.addEventListener('blur', cancelHold);
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) cancelHold();
+    if (document.hidden) {
+      cancelHold();
+      if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+      SoundEngine.suspendCtx();
+    } else {
+      if (!animFrameId && isJuicyMode && (particles.length > 0 || (isKawaiiMode && !isInTheVoid))) {
+        animFrameId = requestAnimationFrame(animateParticles);
+      }
+      if (isSoundEnabled) {
+        SoundEngine.resumeCtx();
+      }
+    }
   });
 
   // 2. Enter The Void
@@ -1825,6 +3654,18 @@ function init3DVoidModule() {
     isInTheVoid = true;
     cachedCardRect = null;
     document.body.classList.add('in-the-void');
+
+    // Always respawn 3D interactive objects so they can be claimed on every Void visit
+    if (easterEgg3D) {
+      easterEgg3D.classList.remove('claimed');
+    }
+    if (cosmicCat3D) {
+      cosmicCat3D.classList.remove('claimed');
+    }
+    maxAltitudeReached = 0;
+    hasEnteredOrbitSoundPlayed = false;
+
+    SoundEngine.playVoidBreakout();
 
     // Reality break burst of particles
     if (isJuicyMode && canvas && ctx) {
@@ -1892,6 +3733,38 @@ function init3DVoidModule() {
     stopGameLoop();
     camY = 0;
     camVy = 0;
+    maxAltitudeReached = 0;
+    hasEnteredOrbitSoundPlayed = false;
+
+    // Reset atmospheric visual state
+    document.body.style.removeProperty('--void-bg');
+    if (voidFloor) voidFloor.style.opacity = '';
+    if (floorShadow) floorShadow.style.opacity = '';
+    if (voidStarfield) voidStarfield.style.opacity = '0';
+    if (voidAltimeter) voidAltimeter.classList.remove('visible');
+    if (voidCloudContainer) {
+      voidCloudContainer.style.opacity = '0';
+      voidCloudContainer.style.display = 'none';
+    }
+
+    // Reset Void Gravity mode state
+    if (isVoidGravityActive) {
+      const container = document.getElementById('voidPhysicsContainer');
+      if (container) container.innerHTML = '';
+      const pageCard = document.getElementById('pageCard');
+      if (pageCard) {
+        pageCard.style.opacity = '1';
+        pageCard.style.pointerEvents = '';
+      }
+      voidPhysicsBodies = [];
+      isVoidGravityActive = false;
+    }
+
+    // Cleanly flush fx canvas and particle queue
+    particles.length = 0;
+    if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    SoundEngine.playVoidExit();
 
     // Swoop camera back to flat 2D
     worldRig.style.transition = 'transform 0.85s cubic-bezier(0.16, 1, 0.3, 1)';
@@ -2011,20 +3884,97 @@ function init3DVoidModule() {
         camYaw += 2.2;
       }
 
-      // Jump & Gravity Arc Physics
+      // Jump & Atmospheric Flutter Propulsion Physics
       const isGrounded = camY <= 0.01;
-      const wantsJump = Boolean(activeKeys['Space'] || activeKeys[' ']);
 
-      if (wantsJump && isGrounded) {
-        camVy = isRunning ? 16.0 : 13.5;
+      if (isGrounded) {
+        // Ground jump: requires a fresh Space press (holding space will never auto-rejump on touchdown)
+        if (justPressedJump) {
+          justPressedJump = false;
+          camVy = isRunning ? 13.5 : 11.5;
+          if (isKawaiiMode) {
+            SoundEngine.playKawaiiBoing();
+            spawnKawaiiHeartPuff();
+          } else {
+            SoundEngine.playJump(isRunning);
+          }
+        }
+      } else {
+        // Mid-air: Subtle flutter / multi-jump impulse on fresh Space press only (no hold-to-fly)
+        if (justPressedJump) {
+          justPressedJump = false;
+          camVy = Math.max(camVy + 6.5, 11.0);
+          camVy = Math.min(camVy, 16.0);
+          
+          if (isKawaiiMode) {
+            SoundEngine.playKawaiiBoing();
+            spawnKawaiiHeartPuff();
+          } else {
+            const { tier } = getAltitudeTier(camY);
+            SoundEngine.playThrusterJump(tier);
+            spawnThrusterPuff();
+          }
+        }
       }
 
       if (!isGrounded || camVy > 0) {
+        // Atmospheric thinning: gravity thins out as altitude increases
+        const baseGrav = 0.85;
+        const grav = baseGrav * (1.0 - 0.55 * Math.min(1.0, camY / 6000.0));
         camY += camVy;
-        camVy -= 0.85; // Gravity
+        camVy -= grav;
+
+        // Cap downward terminal velocity
+        camVy = Math.max(camVy, -34.0);
+
+        // Cap max altitude ceiling
+        if (camY > 7000) {
+          camY = 7000;
+          camVy = Math.min(camVy, 0);
+        }
+
+        if (camY > maxAltitudeReached) {
+          maxAltitudeReached = camY;
+        }
+
+        // Entering orbit chime (once per ascent above 5000m)
+        if (camY >= 5000 && !hasEnteredOrbitSoundPlayed) {
+          hasEnteredOrbitSoundPlayed = true;
+          SoundEngine.playOrbitalEntry();
+        } else if (camY < 3500) {
+          hasEnteredOrbitSoundPlayed = false;
+        }
+
+        // High-velocity atmospheric re-entry burn streaks
+        if (camVy < -16.0 && camY > 600) {
+          const now = performance.now();
+          if (now - lastReentryParticleTime > 60) {
+            lastReentryParticleTime = now;
+            spawnReentryStreaks();
+          }
+        }
+
+        // Touchdown on floor plane
         if (camY <= 0) {
           camY = 0;
+          const impactSpeed = Math.abs(camVy);
           camVy = 0;
+
+          if (impactSpeed > 17.0 || maxAltitudeReached > 750) {
+            // Superhero landing!
+            SoundEngine.playSuperheroLanding();
+            spawnSuperheroShockwave();
+          } else {
+            SoundEngine.playLand();
+          }
+          maxAltitudeReached = 0;
+        }
+      } else if (isGrounded && inputLen > 0) {
+        const now = performance.now();
+        const stepInterval = isRunning ? 250 : 370;
+        if (now - lastFootstepTime >= stepInterval) {
+          lastFootstepTime = now;
+          SoundEngine.playFootstep(isRunning);
         }
       }
 
@@ -2033,6 +3983,22 @@ function init3DVoidModule() {
       if (targetDist < 2500) {
         camX += moveX;
         camZ += moveZ;
+      }
+
+      // Dynamic Atmospheric Visuals based on current altitude
+      updateAtmosphericVisuals(camY, camVy);
+
+      // Proximity check for Cosmic Guardian Cat (Y ≈ 5500, X ≈ 0, Z ≈ -160)
+      if (camY >= 5100 && camY <= 5900) {
+        const catDist = Math.hypot(camX - 0, (camY - 5500), camZ - (-160));
+        if (catDist < 280) {
+          triggerOrbitalCatUnlock();
+        }
+      }
+
+      // Update 3D Void Physics Slabs if Gravity Mode is active
+      if (isVoidGravityActive) {
+        updateVoidPhysicsBodies(moveX, moveZ, isRunning, inputLen);
       }
 
       applyWorldTransform();
@@ -2056,6 +4022,8 @@ function init3DVoidModule() {
       if (!isJuicyMode) return;
       if (easterEgg3D.classList.contains('claimed')) return;
 
+      SoundEngine.playEggShatter();
+
       // Spawn localized golden egg shatter particle explosion
       spawnEggShatterParticles(easterEgg3D);
 
@@ -2069,7 +4037,1167 @@ function init3DVoidModule() {
       _dispenseCelebrationParticles();
     });
   }
+
+  // 7. Cosmic Guardian Cat (0xbk) Interaction
+  if (cosmicCat3D) {
+    cosmicCat3D.addEventListener('click', (e) => {
+      e.stopPropagation();
+      triggerOrbitalCatUnlock();
+    });
+  }
+
+  function triggerOrbitalCatUnlock() {
+    if (!isJuicyMode) return;
+    if (cosmicCat3D && cosmicCat3D.classList.contains('claimed')) return;
+    if (cosmicCat3D) cosmicCat3D.classList.add('claimed');
+
+    SoundEngine.playOrbitalPurr();
+
+    // Cosmic stardust celebration ring around cat
+    if (canvas && ctx) {
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight * 0.45;
+      const starColors = ['#fbbf24', '#f59e0b', '#38bdf8', '#c084fc', '#ffffff'];
+      for (let i = 0; i < 40; i++) {
+        const angle = (Math.PI * 2 * i) / 40;
+        const speed = 3.5 + Math.random() * 5.0;
+        particles.push({
+          x: cx,
+          y: cy,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          size: 3.0 + Math.random() * 4.0,
+          color: starColors[i % starColors.length],
+          alpha: 1.0,
+          decay: 0.02,
+          shape: i % 2 === 0 ? 'diamond' : 'circle',
+          rotation: Math.random() * Math.PI * 2,
+          rotSpeed: (Math.random() - 0.5) * 0.18
+        });
+      }
+      if (!animFrameId) animateParticles();
+    }
+
+    const { isNew, totalFound } = _unlockTelemetry('0xbk');
+    const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
+    _notifyTelemetry(`Orbital Ascent: Escaped the gravitational pull of deadlines!${suffix}`);
+    _dispenseCelebrationParticles();
+  }
+
+  // Altitude Tiers & Dynamic Visuals
+  function getAltitudeTier(y) {
+    if (isKawaiiMode) {
+      if (y < 500) return { tier: 0, name: 'Cotton Ground-nya 🌸' };
+      if (y < 2000) return { tier: 1, name: 'Candy Clouds ~desu ☁️' };
+      if (y < 5000) return { tier: 2, name: 'Pastel Sky nya~ ✨' };
+      return { tier: 3, name: 'Starry Dream ~desu 🌟' };
+    }
+    if (y < 500) return { tier: 0, name: 'Ground Studio' };
+    if (y < 2000) return { tier: 1, name: 'Troposphere' };
+    if (y < 5000) return { tier: 2, name: 'Stratosphere' };
+    return { tier: 3, name: 'Deep Orbit' };
+  }
+
+  function getAtmosphericBgColor(y) {
+    if (y <= 500) {
+      return 'rgb(248, 250, 252)';
+    }
+    if (y < 2000) {
+      const t = (y - 500) / 1500;
+      const r = Math.round(248 + (96 - 248) * t);
+      const g = Math.round(250 + (165 - 250) * t);
+      const b = Math.round(252 + (250 - 252) * t);
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+    if (y < 3500) {
+      const t = (y - 2000) / 1500;
+      const r = Math.round(96 + (49 - 96) * t);
+      const g = Math.round(165 + (46 - 165) * t);
+      const b = Math.round(250 + (129 - 250) * t);
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+    if (y < 5000) {
+      const t = (y - 3500) / 1500;
+      const r = Math.round(49 + (7 - 49) * t);
+      const g = Math.round(46 + (7 - 46) * t);
+      const b = Math.round(129 + (14 - 129) * t);
+      return `rgb(${r}, ${g}, ${b})`;
+    }
+    return 'rgb(5, 5, 10)';
+  }
+
+  let _lastBgColor = '';
+  let _lastFloorOpacity = '';
+  let _lastShadowOpacity = '';
+  let _lastStarOpacity = '';
+  let _lastCloudOpacity = '';
+  let _lastCloudDisplay = '';
+  let _lastAltimeterVisible = null;
+  let _lastAltimeterZone = '';
+  let _lastAltimeterRoundY = -1;
+  let _lastClimbArrowDesc = null;
+  let _lastGaugePct = '';
+
+  function updateAtmosphericVisuals(y, vy) {
+    // 1. Interpolate atmospheric background color (only mutate CSS var when value changes)
+    const bgColor = getAtmosphericBgColor(y);
+    if (bgColor !== _lastBgColor) {
+      _lastBgColor = bgColor;
+      document.body.style.setProperty('--void-bg', bgColor);
+    }
+
+    // 2. Fade floor grid and shadow with altitude
+    if (voidFloor) {
+      const floorOpacity = Math.max(0, 1.0 - (y / 2400)).toFixed(3);
+      if (floorOpacity !== _lastFloorOpacity) {
+        _lastFloorOpacity = floorOpacity;
+        voidFloor.style.opacity = floorOpacity;
+      }
+    }
+    if (floorShadow) {
+      const shadowOpacity = Math.max(0, 1.0 - (y / 700)).toFixed(3);
+      if (shadowOpacity !== _lastShadowOpacity) {
+        _lastShadowOpacity = shadowOpacity;
+        floorShadow.style.opacity = shadowOpacity;
+      }
+    }
+
+    // 3. Fade in starfield in Stratosphere and Space
+    if (voidStarfield) {
+      const starOpacity = Math.max(0, Math.min(1.0, (y - 1800) / 2400)).toFixed(3);
+      if (starOpacity !== _lastStarOpacity) {
+        _lastStarOpacity = starOpacity;
+        voidStarfield.style.opacity = starOpacity;
+      }
+    }
+
+    // 4. Troposphere 3D Clouds
+    if (voidCloudContainer) {
+      let cloudOpacity = 0;
+
+      if (y <= 550) {
+        cloudOpacity = 0;
+      } else if (y < 1100) {
+        const tIn = (y - 550) / 550;
+        const smoothIn = 0.5 * (1 - Math.cos(tIn * Math.PI));
+        cloudOpacity = 0.85 * smoothIn;
+      } else if (y <= 3000) {
+        cloudOpacity = 0.85;
+      } else if (y < 4800) {
+        const tOut = (y - 3000) / 1800;
+        const smoothOut = 0.5 * (1 + Math.cos(tOut * Math.PI));
+        cloudOpacity = 0.85 * smoothOut;
+      } else {
+        cloudOpacity = 0;
+      }
+
+      if (cloudOpacity <= 0.002) {
+        if (_lastCloudDisplay !== 'none') {
+          _lastCloudDisplay = 'none';
+          _lastCloudOpacity = '0';
+          voidCloudContainer.style.opacity = '0';
+          voidCloudContainer.style.display = 'none';
+        }
+      } else {
+        const strOp = cloudOpacity.toFixed(3);
+        if (_lastCloudDisplay !== 'block') {
+          _lastCloudDisplay = 'block';
+          voidCloudContainer.style.display = 'block';
+        }
+        if (strOp !== _lastCloudOpacity) {
+          _lastCloudOpacity = strOp;
+          voidCloudContainer.style.opacity = strOp;
+        }
+      }
+    }
+
+    // 5. Update Altimeter Telemetry HUD
+    if (voidAltimeter) {
+      const isVisible = y > 140;
+      if (isVisible !== _lastAltimeterVisible) {
+        _lastAltimeterVisible = isVisible;
+        if (isVisible) {
+          voidAltimeter.classList.add('visible');
+        } else {
+          voidAltimeter.classList.remove('visible');
+        }
+      }
+
+      const { name } = getAltitudeTier(y);
+      if (altimeterZone && name !== _lastAltimeterZone) {
+        _lastAltimeterZone = name;
+        altimeterZone.textContent = name;
+      }
+      const roundY = Math.round(y);
+      if (altimeterValue && roundY !== _lastAltimeterRoundY) {
+        _lastAltimeterRoundY = roundY;
+        altimeterValue.textContent = roundY.toLocaleString();
+      }
+      if (altimeterClimbArrow) {
+        const isDesc = vy < -1.0;
+        if (isDesc !== _lastClimbArrowDesc) {
+          _lastClimbArrowDesc = isDesc;
+          if (isDesc) {
+            altimeterClimbArrow.classList.add('descending');
+          } else {
+            altimeterClimbArrow.classList.remove('descending');
+          }
+        }
+      }
+      if (altimeterGaugeFill) {
+        const pct = Math.min(100, Math.max(0, (y / 6000) * 100)).toFixed(1);
+        if (pct !== _lastGaugePct) {
+          _lastGaugePct = pct;
+          altimeterGaugeFill.style.width = `${pct}%`;
+        }
+      }
+    }
+  }
+
+  function spawnThrusterPuff() {
+    if (!canvas || !ctx || !isJuicyMode) return;
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight * 0.78;
+    const puffColors = ['#38bdf8', '#7dd3fc', '#ffffff', '#fbbf24'];
+    for (let i = 0; i < 8; i++) {
+      const angle = Math.PI * 0.5 + (Math.random() - 0.5) * 0.8;
+      const speed = 2.5 + Math.random() * 4.0;
+      particles.push({
+        x: cx + (Math.random() - 0.5) * 30,
+        y: cy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size: 2.0 + Math.random() * 2.5,
+        color: puffColors[Math.floor(Math.random() * puffColors.length)],
+        alpha: 0.85,
+        decay: 0.05 + Math.random() * 0.03,
+        shape: 'circle',
+        rotation: 0,
+        rotSpeed: 0
+      });
+    }
+    if (!animFrameId) animateParticles();
+  }
+
+  function spawnReentryStreaks() {
+    if (!canvas || !ctx || !isJuicyMode) return;
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    for (let i = 0; i < 4; i++) {
+      const isLeft = Math.random() > 0.5;
+      const x = isLeft ? Math.random() * 140 : (w - Math.random() * 140);
+      const speed = 14.0 + Math.random() * 16.0;
+      particles.push({
+        x,
+        y: h + 10,
+        vx: (isLeft ? 1 : -1) * (Math.random() * 2),
+        vy: -speed,
+        size: 2.2 + Math.random() * 2.5,
+        color: Math.random() > 0.35 ? '#fbbf24' : '#f97316',
+        alpha: 0.9,
+        decay: 0.05,
+        shape: 'rect',
+        rotation: 0,
+        rotSpeed: 0
+      });
+    }
+    if (!animFrameId) animateParticles();
+  }
+
+  function spawnSuperheroShockwave() {
+    if (!canvas || !ctx || !isJuicyMode) return;
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight * 0.72;
+    const colors = ['#f59e0b', '#fbbf24', '#ffffff', '#38bdf8', '#818cf8'];
+
+    // Crisp, fast-decaying sparks shooting outward along the ground (no lingering gray dust circles)
+    for (let i = 0; i < 20; i++) {
+      const angle = (Math.random() > 0.5 ? 0 : Math.PI) + (Math.random() - 0.5) * 0.8;
+      const speed = 6.0 + Math.random() * 9.0;
+      particles.push({
+        x: cx,
+        y: cy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed * 0.2 - Math.random() * 2.0,
+        size: 2.5 + Math.random() * 3.0,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        alpha: 1.0,
+        decay: 0.045 + Math.random() * 0.025,
+        shape: Math.random() > 0.5 ? 'diamond' : 'circle',
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.2
+      });
+    }
+
+    // Screen shake on viewport
+    const viewport = document.getElementById('appViewport');
+    if (viewport) {
+      viewport.classList.remove('superhero-shake');
+      void viewport.offsetWidth;
+      viewport.classList.add('superhero-shake');
+      setTimeout(() => {
+        viewport.classList.remove('superhero-shake');
+      }, 420);
+    }
+
+    if (!animFrameId) animateParticles();
+  }
+
+  // ==========================================================================
+  // 3D Void Gravity Mode (Secret #12: 0xcl "Gravity Mode") — Physics Slabs & Kicking
+  // ==========================================================================
+  let isVoidGravityActive = false;
+  let voidPhysicsBodies = [];
+
+  function spawnKickDustSparks(worldX, worldY, worldZ) {
+    if (!canvas || !ctx || !isJuicyMode) return;
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight * 0.72;
+    const palette = ['#60a5fa', '#38bdf8', '#fbbf24', '#ffffff', '#94a3b8'];
+    for (let i = 0; i < 14; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 3.5 + Math.random() * 6.5;
+      particles.push({
+        x: cx + (Math.random() - 0.5) * 120,
+        y: cy + (Math.random() - 0.5) * 40,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed * 0.45 - 2.2,
+        size: 2.2 + Math.random() * 2.8,
+        color: palette[Math.floor(Math.random() * palette.length)],
+        alpha: 1.0,
+        decay: 0.045,
+        shape: Math.random() > 0.5 ? 'diamond' : 'circle',
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.22
+      });
+    }
+    if (!animFrameId) animateParticles();
+  }
+
+  function toggleVoidGravityMode() {
+    if (!isJuicyMode) {
+      _notifyTelemetry('Switch to Juicy Mode to unlock secrets!');
+      return;
+    }
+    if (isVoidGravityActive) {
+      restoreVoidGravityMode();
+    } else {
+      activateVoidGravityMode();
+    }
+  }
+
+  function activateVoidGravityMode() {
+    if (isVoidGravityActive) return;
+    isVoidGravityActive = true;
+
+    const { isNew, totalFound } = _unlockTelemetry('0xcl');
+    const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
+    _notifyTelemetry(`Sir Isaac Newton has entered The Void! Gravity active. [G to restore]${suffix}`);
+    SoundEngine.playGravityDrop();
+
+    const pageCard = document.getElementById('pageCard');
+    const container = document.getElementById('voidPhysicsContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const slabs = [];
+
+    // 1. Header nav bar
+    const origHeader = document.querySelector('#pageFront > header');
+    if (origHeader) {
+      const clone = origHeader.cloneNode(true);
+      clone.className = 'px-4 py-2 bg-white/95 backdrop-blur-md rounded-xl shadow-xs border border-slate-200';
+      slabs.push({
+        id: 'header',
+        content: clone,
+        w: 780,
+        h: 56,
+        x: 0,
+        y: -350,
+        z: 0,
+        radius: 240,
+        floorY: 495
+      });
+    }
+
+    // 2. Hero title banner
+    const origHero = document.querySelector('#mainContainer > div.text-center');
+    if (origHero) {
+      const clone = origHero.cloneNode(true);
+      clone.className = 'p-4 bg-white/95 rounded-xl shadow-xs border border-slate-200 text-center';
+      slabs.push({
+        id: 'hero',
+        content: clone,
+        w: 460,
+        h: 92,
+        x: 0,
+        y: -250,
+        z: 0,
+        radius: 170,
+        floorY: 492
+      });
+    }
+
+    // 3. Search form
+    const origForm = document.getElementById('tokenForm');
+    if (origForm) {
+      const clone = origForm.cloneNode(true);
+      clone.className = 'p-3 bg-white rounded-xl shadow-xs';
+      slabs.push({
+        id: 'search',
+        content: clone,
+        w: 440,
+        h: 105,
+        x: 0,
+        y: -135,
+        z: 0,
+        radius: 160,
+        floorY: 492
+      });
+    }
+
+    // 4. Easter Egg from back
+    const origEgg = document.getElementById('easterEgg3D');
+    if (origEgg) {
+      const clone = origEgg.cloneNode(true);
+      clone.className = 'p-3 bg-slate-900/90 rounded-xl shadow-xs border border-amber-400/40 text-center text-white';
+      slabs.push({
+        id: 'egg',
+        content: clone,
+        w: 140,
+        h: 150,
+        x: 0,
+        y: -40,
+        z: -20,
+        radius: 70,
+        floorY: 480
+      });
+    }
+
+    // 5. GETXR Card
+    const origGetxr = document.getElementById('cardGetxr');
+    if (origGetxr) {
+      const clone = origGetxr.cloneNode(true);
+      const notEnrolled = clone.querySelector('#getxrNotEnrolled');
+      if (notEnrolled) notEnrolled.classList.add('hidden');
+      const enrolled = clone.querySelector('#getxrEnrolledContent');
+      if (enrolled) enrolled.classList.remove('hidden');
+      const isResultsVisible = currentStudentId && document.getElementById('resultsContainer') && !document.getElementById('resultsContainer').classList.contains('hidden');
+      const balance = clone.querySelector('#getxrBalance');
+      if (balance && (!isResultsVisible || !balance.textContent.trim())) balance.textContent = '2.0';
+      const badge = clone.querySelector('#getxrStatusBadge');
+      if (badge && (!isResultsVisible || !badge.textContent.trim())) {
+        badge.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-medium shrink-0 bg-blue-100 text-blue-700';
+        badge.textContent = 'Enrolled';
+      }
+      slabs.push({
+        id: 'getxr',
+        content: clone,
+        w: 380,
+        h: 320,
+        x: -205,
+        y: 80,
+        z: 0,
+        radius: 160,
+        floorY: 485
+      });
+    }
+
+    // 6. 3DMA Card
+    const orig3dma = document.getElementById('card3dma');
+    if (orig3dma) {
+      const clone = orig3dma.cloneNode(true);
+      const notEnrolled = clone.querySelector('#threedmaNotEnrolled');
+      if (notEnrolled) notEnrolled.classList.add('hidden');
+      const enrolled = clone.querySelector('#threedmaEnrolledContent');
+      if (enrolled) enrolled.classList.remove('hidden');
+      const isResultsVisible = currentStudentId && document.getElementById('resultsContainer') && !document.getElementById('resultsContainer').classList.contains('hidden');
+      const balance = clone.querySelector('#threedmaBalance');
+      if (balance && (!isResultsVisible || !balance.textContent.trim())) balance.textContent = '2.0';
+      const badge = clone.querySelector('#threedmaStatusBadge');
+      if (badge && (!isResultsVisible || !badge.textContent.trim())) {
+        badge.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-medium shrink-0 bg-emerald-100 text-emerald-700';
+        badge.textContent = 'Enrolled';
+      }
+      slabs.push({
+        id: '3dma',
+        content: clone,
+        w: 380,
+        h: 320,
+        x: 205,
+        y: 80,
+        z: 0,
+        radius: 160,
+        floorY: 485
+      });
+    }
+
+    // 7. Quick Guide Cards
+    const guideElements = document.querySelectorAll('#mainContainer .grid > div');
+    const guideXs = [-260, 0, 260];
+    guideElements.forEach((gEl, idx) => {
+      if (idx < 3) {
+        const clone = gEl.cloneNode(true);
+        slabs.push({
+          id: `guide${idx}`,
+          content: clone,
+          w: 235,
+          h: 125,
+          x: guideXs[idx],
+          y: 275,
+          z: 0,
+          radius: 100,
+          floorY: 488
+        });
+      }
+    });
+
+    voidPhysicsBodies = slabs.map(s => {
+      const slabEl = document.createElement('div');
+      slabEl.className = 'void-physics-slab';
+      slabEl.style.width = `${s.w}px`;
+      slabEl.style.height = `${s.h}px`;
+
+      const contentWrap = document.createElement('div');
+      contentWrap.className = 'slab-content';
+      contentWrap.appendChild(s.content);
+      slabEl.appendChild(contentWrap);
+
+      container.appendChild(slabEl);
+
+      const body = {
+        id: s.id,
+        el: slabEl,
+        origX: s.x,
+        origY: s.y,
+        origZ: s.z,
+        x: s.x,
+        y: s.y,
+        z: s.z,
+        w: s.w,
+        h: s.h,
+        radius: s.radius,
+        floorY: s.floorY,
+        vx: (Math.random() - 0.5) * 5.0,
+        vy: (Math.random() * -2.2) - 1.2,
+        vz: (Math.random() - 0.5) * 5.0,
+        rotX: 0,
+        rotY: (Math.random() - 0.5) * 14.0,
+        rotZ: (Math.random() - 0.5) * 6.0,
+        vRotY: (Math.random() - 0.5) * 12.0,
+        state: 'falling'
+      };
+
+      const px = body.x - body.w / 2;
+      const py = body.y - body.h / 2;
+      slabEl.style.transform = `translate3d(${px.toFixed(1)}px, ${py.toFixed(1)}px, ${body.z.toFixed(1)}px) rotateY(${body.rotY.toFixed(1)}deg) rotateX(0deg)`;
+
+      return body;
+    });
+
+    if (pageCard) {
+      pageCard.style.opacity = '0';
+      pageCard.style.pointerEvents = 'none';
+    }
+  }
+
+  function updateVoidPhysicsBodies(moveX, moveZ, isRunning, inputLen) {
+    if (!isVoidGravityActive || voidPhysicsBodies.length === 0) return;
+
+    const playerRadius = 70;
+    const isPlayerGrounded = camY <= 140;
+
+    for (let i = 0; i < voidPhysicsBodies.length; i++) {
+      const s = voidPhysicsBodies[i];
+
+      // Gravity & Vertical Motion
+      if (s.state === 'falling') {
+        s.vy += 1.25;
+        s.y += s.vy;
+        s.x += s.vx;
+        s.z += s.vz;
+        s.rotX += (84 - s.rotX) * 0.055;
+        s.rotY += s.vRotY;
+
+        if (s.y >= s.floorY) {
+          s.y = s.floorY;
+          if (Math.abs(s.vy) > 3.0) {
+            SoundEngine.playPhysicsBounce(Math.abs(s.vy));
+            s.vy = -s.vy * 0.32;
+            s.vx *= 0.88;
+            s.vz *= 0.88;
+          } else {
+            s.vy = 0;
+            s.rotX = 84;
+            s.state = 'landed';
+            SoundEngine.playPhysicsBounce(5.5);
+          }
+        }
+      } else {
+        // Landed / Sliding state
+        s.y = s.floorY;
+        s.rotX = 84;
+        s.vx *= 0.925;
+        s.vz *= 0.925;
+        s.vRotY *= 0.91;
+
+        if (Math.abs(s.vx) < 0.04) s.vx = 0;
+        if (Math.abs(s.vz) < 0.04) s.vz = 0;
+        if (Math.abs(s.vRotY) < 0.04) s.vRotY = 0;
+
+        s.x += s.vx;
+        s.z += s.vz;
+        s.rotY += s.vRotY;
+      }
+
+      // Soft Arena bounds
+      if (Math.abs(s.x) > 2200) {
+        s.vx = -s.vx * 0.5;
+        s.x = Math.sign(s.x) * 2200;
+      }
+      if (Math.abs(s.z) > 2200) {
+        s.vz = -s.vz * 0.5;
+        s.z = Math.sign(s.z) * 2200;
+      }
+
+      // Player Collision & Kicking
+      if (isPlayerGrounded) {
+        const dx = s.x - camX;
+        const dz = s.z - camZ;
+        const dist = Math.hypot(dx, dz);
+        const minDist = playerRadius + s.radius;
+
+        if (dist < minDist) {
+          const nx = dist > 0.001 ? dx / dist : 0;
+          const nz = dist > 0.001 ? dz / dist : 1;
+          const overlap = minDist - dist;
+
+          s.x += nx * overlap;
+          s.z += nz * overlap;
+
+          const playerSpeed = Math.hypot(moveX, moveZ);
+          if (inputLen > 0 || playerSpeed > 0.5) {
+            // Player kicked the card!
+            const kickPower = isRunning ? 32.0 : 18.0;
+            s.vx += nx * kickPower + moveX * 0.95;
+            s.vz += nz * kickPower + moveZ * 0.95;
+            s.vRotY += (Math.random() - 0.5) * (isRunning ? 34.0 : 20.0);
+            s.state = 'falling';
+            s.vy = isRunning ? -5.5 : -3.2; // hop into air
+            SoundEngine.playCardKick(isRunning ? 1.5 : 1.0);
+            spawnKickDustSparks(s.x, s.floorY, s.z);
+          } else {
+            // Stationary collision
+            s.vx += nx * 5.0;
+            s.vz += nz * 5.0;
+            s.vRotY += (Math.random() - 0.5) * 8.0;
+            SoundEngine.playCardKick(0.55);
+          }
+        }
+      }
+    }
+
+    // Slab-to-Slab Carom (Billiards collisions)
+    for (let i = 0; i < voidPhysicsBodies.length; i++) {
+      for (let j = i + 1; j < voidPhysicsBodies.length; j++) {
+        const s1 = voidPhysicsBodies[i];
+        const s2 = voidPhysicsBodies[j];
+        const dx = s2.x - s1.x;
+        const dz = s2.z - s1.z;
+        const dist = Math.hypot(dx, dz);
+        const minDist = s1.radius + s2.radius;
+
+        if (dist < minDist && dist > 0.01) {
+          const overlap = minDist - dist;
+          const nx = dx / dist;
+          const nz = dz / dist;
+
+          s1.x -= nx * overlap * 0.5;
+          s1.z -= nz * overlap * 0.5;
+          s2.x += nx * overlap * 0.5;
+          s2.z += nz * overlap * 0.5;
+
+          const relVx = s1.vx - s2.vx;
+          const relVz = s1.vz - s2.vz;
+          const impulse = (relVx * nx + relVz * nz) * 0.5;
+
+          if (impulse > 0.5) {
+            s1.vx -= nx * impulse;
+            s1.vz -= nz * impulse;
+            s2.vx += nx * impulse;
+            s2.vz += nz * impulse;
+            SoundEngine.playPhysicsBounce(Math.min(14, impulse * 3));
+          }
+        }
+      }
+    }
+
+    // Render Transforms
+    for (let i = 0; i < voidPhysicsBodies.length; i++) {
+      const s = voidPhysicsBodies[i];
+      const px = s.x - s.w / 2;
+      const py = s.y - s.h / 2;
+      const pz = s.z;
+      s.el.style.transform = `translate3d(${px.toFixed(1)}px, ${py.toFixed(1)}px, ${pz.toFixed(1)}px) rotateY(${s.rotY.toFixed(1)}deg) rotateX(${s.rotX.toFixed(1)}deg) rotateZ(${s.rotZ.toFixed(1)}deg)`;
+    }
+  }
+
+  function restoreVoidGravityMode() {
+    if (!isVoidGravityActive) return;
+    isVoidGravityActive = false;
+    SoundEngine.playGravityRestore();
+
+    const container = document.getElementById('voidPhysicsContainer');
+    const pageCard = document.getElementById('pageCard');
+
+    voidPhysicsBodies.forEach(s => {
+      s.el.classList.add('restoring');
+      const px = s.origX - s.w / 2;
+      const py = s.origY - s.h / 2;
+      const pz = s.origZ;
+      s.el.style.transform = `translate3d(${px.toFixed(1)}px, ${py.toFixed(1)}px, ${pz.toFixed(1)}px) rotateY(0deg) rotateX(0deg) rotateZ(0deg)`;
+      s.el.style.opacity = '0.9';
+    });
+
+    setTimeout(() => {
+      if (container) container.innerHTML = '';
+      voidPhysicsBodies = [];
+      if (pageCard) {
+        pageCard.style.transition = 'opacity 0.4s ease';
+        pageCard.style.opacity = '1';
+        pageCard.style.pointerEvents = '';
+        setTimeout(() => {
+          if (pageCard) pageCard.style.transition = '';
+        }, 420);
+      }
+      _notifyTelemetry('Standard Gravity RESTORED. Monolith assembled.');
+    }, 840);
+  }
+
+  window.toggleVoidGravityMode = toggleVoidGravityMode;
 }
+
+// ==========================================================================
+// Gravity Collapse System (Secret #12: 0xcl "Gravity Mode") — 2D Fallback
+// ==========================================================================
+
+let isGravityModeActive = false;
+let gravityBodies = [];
+let gravityAnimationId = null;
+let draggedBody = null;
+let origPageMinHeight = '';
+
+function _collectGravityElements() {
+  const elements = [];
+  const header = document.querySelector('#pageFront > header');
+  if (header) elements.push(header);
+
+  const main = document.getElementById('mainContainer');
+  if (main) {
+    // 1. Hero title block
+    const hero = main.querySelector(':scope > div.text-center');
+    if (hero) elements.push(hero);
+
+    // 2. Search form wrapper
+    const searchWrap = main.querySelector(':scope > div.max-w-md');
+    if (searchWrap) elements.push(searchWrap);
+
+    // 3. Results elements if active
+    const resultsContainer = document.getElementById('resultsContainer');
+    if (resultsContainer && !resultsContainer.classList.contains('hidden')) {
+      const studentBar = resultsContainer.children[0];
+      const tipBar = resultsContainer.children[1];
+      const getxrCard = document.getElementById('cardGetxr');
+      const threedmaCard = document.getElementById('card3dma');
+      if (studentBar) elements.push(studentBar);
+      if (tipBar) elements.push(tipBar);
+      if (getxrCard) elements.push(getxrCard);
+      if (threedmaCard) elements.push(threedmaCard);
+    }
+
+    // 4. Quick guide section
+    const guideSection = main.querySelector(':scope > div.mt-8');
+    if (guideSection) {
+      const guideHeading = guideSection.querySelector('h4');
+      if (guideHeading) elements.push(guideHeading);
+      const guideCards = guideSection.querySelectorAll('.grid > div');
+      guideCards.forEach(card => elements.push(card));
+    }
+  }
+
+  const footer = document.querySelector('#pageFront > footer');
+  if (footer) elements.push(footer);
+
+  return elements.filter(el => {
+    const rect = el.getBoundingClientRect();
+    return rect.width > 10 && rect.height > 10;
+  });
+}
+
+function _createGravityHud() {
+  const existing = document.getElementById('gravityModeHud');
+  if (existing) existing.remove();
+
+  const hud = document.createElement('div');
+  hud.id = 'gravityModeHud';
+  hud.className = 'gravity-hud';
+  hud.innerHTML = `
+    <div class="gravity-hud-indicator"></div>
+    <div class="gravity-hud-content">
+      <span class="gravity-hud-title">Gravity Collapse Active</span>
+      <span class="gravity-hud-hint">Click &amp; throw cards!</span>
+    </div>
+    <button type="button" id="restoreGravityBtn" class="gravity-hud-btn" title="Restore Page [ESC or G]">
+      <span>Restore</span>
+      <span class="kbd-pill">ESC</span>
+    </button>
+  `;
+  document.body.appendChild(hud);
+
+  const btn = document.getElementById('restoreGravityBtn');
+  if (btn) {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      restoreGravityMode();
+    });
+  }
+}
+
+function onGravityPointerDown(e) {
+  if (e.target.closest('#restoreGravityBtn')) return;
+  const targetBody = gravityBodies.find(b => b.el === e.target || b.el.contains(e.target));
+  if (!targetBody) return;
+  draggedBody = targetBody;
+  targetBody.isDragging = true;
+  targetBody.dragOffsetX = e.clientX - targetBody.x;
+  targetBody.dragOffsetY = e.clientY - targetBody.y;
+  targetBody.lastPointerX = e.clientX;
+  targetBody.lastPointerY = e.clientY;
+  targetBody.lastPointerTime = performance.now();
+  targetBody.pointerVx = 0;
+  targetBody.pointerVy = 0;
+  targetBody.el.style.cursor = 'grabbing';
+  targetBody.el.style.zIndex = '150';
+
+  if (!gravityAnimationId && isGravityModeActive) {
+    gravityAnimationId = requestAnimationFrame(_runGravityPhysicsLoop);
+  }
+}
+
+function onGravityPointerMove(e) {
+  if (!draggedBody) return;
+  const now = performance.now();
+  const dt = Math.max(1, now - draggedBody.lastPointerTime);
+  const instVx = (e.clientX - draggedBody.lastPointerX) / (dt / 16.6);
+  const instVy = (e.clientY - draggedBody.lastPointerY) / (dt / 16.6);
+  draggedBody.pointerVx = draggedBody.pointerVx * 0.4 + instVx * 0.6;
+  draggedBody.pointerVy = draggedBody.pointerVy * 0.4 + instVy * 0.6;
+  draggedBody.lastPointerX = e.clientX;
+  draggedBody.lastPointerY = e.clientY;
+  draggedBody.lastPointerTime = now;
+  draggedBody.x = e.clientX - draggedBody.dragOffsetX;
+  draggedBody.y = e.clientY - draggedBody.dragOffsetY;
+}
+
+function onGravityPointerUp() {
+  if (!draggedBody) return;
+  draggedBody.isDragging = false;
+  draggedBody.vx = Math.max(-28, Math.min(28, draggedBody.pointerVx));
+  draggedBody.vy = Math.max(-28, Math.min(28, draggedBody.pointerVy));
+  draggedBody.vAngle = draggedBody.vx * 0.5;
+  draggedBody.el.style.cursor = 'grab';
+  draggedBody.el.style.zIndex = '60';
+  draggedBody = null;
+}
+
+function _runGravityPhysicsLoop() {
+  if (!isGravityModeActive) return;
+
+  const floorY = window.innerHeight - 8;
+  const wallLeft = 8;
+  const wallRight = window.innerWidth - 8;
+  const gravity = 0.72;
+
+  // Stacking repulsion between bodies resting on or near floor
+  for (let i = 0; i < gravityBodies.length; i++) {
+    for (let j = i + 1; j < gravityBodies.length; j++) {
+      const b1 = gravityBodies[i];
+      const b2 = gravityBodies[j];
+      if (b1.isDragging || b2.isDragging) continue;
+      const c1x = b1.x + b1.w / 2;
+      const c1y = b1.y + b1.h / 2;
+      const c2x = b2.x + b2.w / 2;
+      const c2y = b2.y + b2.h / 2;
+      const dx = c2x - c1x;
+      const dy = c2y - c1y;
+      const minDistX = (b1.w + b2.w) * 0.42;
+      const minDistY = (b1.h + b2.h) * 0.42;
+      if (Math.abs(dx) < minDistX && Math.abs(dy) < minDistY) {
+        const overlapX = minDistX - Math.abs(dx);
+        const overlapY = minDistY - Math.abs(dy);
+        if (overlapX < overlapY) {
+          const sign = dx > 0 ? 1 : -1;
+          b1.x -= sign * overlapX * 0.2;
+          b2.x += sign * overlapX * 0.2;
+          b1.vx -= sign * 0.35;
+          b2.vx += sign * 0.35;
+        } else {
+          const sign = dy > 0 ? 1 : -1;
+          b1.y -= sign * overlapY * 0.2;
+          b2.y += sign * overlapY * 0.2;
+          b1.vy -= sign * 0.35;
+          b2.vy += sign * 0.35;
+        }
+      }
+    }
+  }
+
+  for (let i = 0; i < gravityBodies.length; i++) {
+    const b = gravityBodies[i];
+    const rad = Math.abs((b.angle * Math.PI) / 180);
+    const halfDiag = (Math.abs(Math.sin(rad) * b.w) + Math.abs(Math.cos(rad) * b.h)) / 2;
+    const halfWidth = (Math.abs(Math.cos(rad) * b.w) + Math.abs(Math.sin(rad) * b.h)) / 2;
+
+    if (b.isDragging) {
+      // While dragging, keep within viewport
+      const centerY = b.y + b.h / 2;
+      if (centerY + halfDiag > floorY) {
+        b.y = floorY - halfDiag - b.h / 2;
+      }
+    } else {
+      b.vy += gravity;
+      b.vx *= 0.992;
+      b.vAngle *= 0.985;
+      b.x += b.vx;
+      b.y += b.vy;
+      b.angle += b.vAngle;
+
+      // Floor collision
+      const centerY = b.y + b.h / 2;
+      if (centerY + halfDiag >= floorY) {
+        b.y = floorY - halfDiag - b.h / 2;
+        if (Math.abs(b.vy) > 1.8) {
+          SoundEngine.playPhysicsBounce(Math.abs(b.vy));
+        }
+        b.vy = -b.vy * b.restitution;
+        b.vx *= b.friction;
+        // Ground friction settles angle
+        b.vAngle = b.vAngle * 0.5 - (b.angle * 0.05) + (b.vx * 0.15);
+        if (Math.abs(b.vy) < 0.7 && Math.abs(b.vx) < 0.25) {
+          b.vy = 0;
+          b.vx = 0;
+          b.vAngle *= 0.7;
+        }
+      }
+
+      // Left wall collision
+      const centerX = b.x + b.w / 2;
+      if (centerX - halfWidth < wallLeft) {
+        b.x = wallLeft + halfWidth - b.w / 2;
+        b.vx = -b.vx * b.restitution;
+        b.vAngle *= 0.7;
+        if (Math.abs(b.vx) > 2.0) {
+          SoundEngine.playPhysicsBounce(Math.abs(b.vx));
+        }
+      }
+
+      // Right wall collision
+      if (centerX + halfWidth > wallRight) {
+        b.x = wallRight - halfWidth - b.w / 2;
+        b.vx = -b.vx * b.restitution;
+        b.vAngle *= 0.7;
+        if (Math.abs(b.vx) > 2.0) {
+          SoundEngine.playPhysicsBounce(Math.abs(b.vx));
+        }
+      }
+
+      // Ceiling bounce
+      if (centerY - halfDiag < 0) {
+        b.y = halfDiag - b.h / 2;
+        b.vy = -b.vy * 0.4;
+      }
+    }
+
+    const dx = b.x - b.origX;
+    const dy = b.y - b.origY;
+    b.el.style.transform = `translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0) rotate(${b.angle.toFixed(2)}deg)`;
+  }
+
+  const hasMotion = gravityBodies.some(b => b.isDragging || Math.abs(b.vx) > 0.08 || Math.abs(b.vy) > 0.08 || Math.abs(b.vAngle) > 0.08);
+
+  if (hasMotion || draggedBody) {
+    gravityAnimationId = requestAnimationFrame(_runGravityPhysicsLoop);
+  } else {
+    gravityAnimationId = null;
+  }
+}
+
+function triggerGravityMode() {
+  if (!isJuicyMode) {
+    _notifyTelemetry('Switch to Juicy Mode to unlock secrets!');
+    return;
+  }
+
+  // If in The Void, toggle 3D Void Gravity mode
+  if (isInTheVoid) {
+    if (typeof window.toggleVoidGravityMode === 'function') {
+      window.toggleVoidGravityMode();
+    }
+    return;
+  }
+
+  if (isGravityModeActive) {
+    restoreGravityMode();
+    return;
+  }
+
+  const { isNew, totalFound } = _unlockTelemetry('0xcl');
+  const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
+  _notifyTelemetry(`Sir Isaac Newton has entered the classroom!${suffix}`);
+
+  isGravityModeActive = true;
+  SoundEngine.playGravityDrop();
+
+  const elements = _collectGravityElements();
+  if (elements.length === 0) return;
+
+  const pageFront = document.getElementById('pageFront');
+  if (pageFront) {
+    origPageMinHeight = pageFront.style.minHeight || '';
+    pageFront.style.minHeight = `${pageFront.offsetHeight}px`;
+  }
+  document.body.style.overflow = 'hidden';
+
+  gravityBodies = elements.map(el => {
+    const rect = el.getBoundingClientRect();
+    const origStyle = {
+      position: el.style.position || '',
+      left: el.style.left || '',
+      top: el.style.top || '',
+      width: el.style.width || '',
+      height: el.style.height || '',
+      transform: el.style.transform || '',
+      transition: el.style.transition || '',
+      zIndex: el.style.zIndex || '',
+      margin: el.style.margin || '',
+      boxSizing: el.style.boxSizing || '',
+      cursor: el.style.cursor || '',
+      userSelect: el.style.userSelect || ''
+    };
+
+    const body = {
+      el,
+      origStyle,
+      origX: rect.left,
+      origY: rect.top,
+      x: rect.left,
+      y: rect.top,
+      w: rect.width,
+      h: rect.height,
+      vx: (Math.random() - 0.5) * 4.5,
+      vy: (Math.random() * -3.0) - 0.8,
+      angle: 0,
+      vAngle: (Math.random() - 0.5) * 5.0,
+      restitution: 0.38 + Math.random() * 0.15,
+      friction: 0.94,
+      isDragging: false,
+      dragOffsetX: 0,
+      dragOffsetY: 0,
+      lastPointerX: rect.left,
+      lastPointerY: rect.top,
+      lastPointerTime: performance.now(),
+      pointerVx: 0,
+      pointerVy: 0
+    };
+
+    el.style.position = 'fixed';
+    el.style.left = `${rect.left}px`;
+    el.style.top = `${rect.top}px`;
+    el.style.width = `${rect.width}px`;
+    el.style.height = `${rect.height}px`;
+    el.style.margin = '0';
+    el.style.boxSizing = 'border-box';
+    el.style.zIndex = '60';
+    el.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
+    el.style.transition = 'none';
+    el.style.cursor = 'grab';
+    el.style.userSelect = 'none';
+    el.classList.add('gravity-body');
+
+    return body;
+  });
+
+  window.addEventListener('pointerdown', onGravityPointerDown);
+  window.addEventListener('pointermove', onGravityPointerMove);
+  window.addEventListener('pointerup', onGravityPointerUp);
+  window.addEventListener('pointercancel', onGravityPointerUp);
+
+  _createGravityHud();
+  _runGravityPhysicsLoop();
+}
+
+function restoreGravityMode() {
+  if (!isGravityModeActive) return;
+  isGravityModeActive = false;
+
+  if (gravityAnimationId) {
+    cancelAnimationFrame(gravityAnimationId);
+    gravityAnimationId = null;
+  }
+
+  window.removeEventListener('pointerdown', onGravityPointerDown);
+  window.removeEventListener('pointermove', onGravityPointerMove);
+  window.removeEventListener('pointerup', onGravityPointerUp);
+  window.removeEventListener('pointercancel', onGravityPointerUp);
+
+  const hud = document.getElementById('gravityModeHud');
+  if (hud) {
+    hud.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+    hud.style.opacity = '0';
+    hud.style.transform = 'translateX(-50%) translateY(-20px)';
+    setTimeout(() => hud.remove(), 260);
+  }
+
+  SoundEngine.playGravityRestore();
+
+  gravityBodies.forEach(b => {
+    b.el.style.transition = 'transform 0.65s cubic-bezier(0.19, 1, 0.22, 1)';
+    b.el.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
+  });
+
+  setTimeout(() => {
+    gravityBodies.forEach(b => {
+      const s = b.origStyle;
+      b.el.style.position = s.position;
+      b.el.style.left = s.left;
+      b.el.style.top = s.top;
+      b.el.style.width = s.width;
+      b.el.style.height = s.height;
+      b.el.style.transform = s.transform;
+      b.el.style.transition = s.transition;
+      b.el.style.zIndex = s.zIndex;
+      b.el.style.margin = s.margin;
+      b.el.style.boxSizing = s.boxSizing;
+      b.el.style.cursor = s.cursor;
+      b.el.style.userSelect = s.userSelect;
+      b.el.classList.remove('gravity-body');
+    });
+
+    const pageFront = document.getElementById('pageFront');
+    if (pageFront) pageFront.style.minHeight = origPageMinHeight;
+    document.body.style.overflow = '';
+    gravityBodies = [];
+    draggedBody = null;
+  }, 660);
+}
+
+// DevTools console helpers for Gravity Mode
+window.gravity = function() {
+  triggerGravityMode();
+  return '🍏 Isaac Newton would like to know your location.';
+};
+window.toggleGravity = window.gravity;
+window.gravity.toString = () => { window.gravity(); return '🍏 Gravity toggled.'; };
 
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', async () => {
@@ -2098,13 +5226,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 %c[Interactive Media 2026]%c Late Token Engine v2.0
 • WebCrypto SHA-256 local verification
 • Canvas FX & Telemetry active
-• The cat looks like it wants to be petted...`,
+• The cat looks like it wants to be petted...
+• Press 'G' or type 'gravity' if things feel too grounded...`,
     'color: #d97706; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.25;',
     '',
     'color: #d97706; font-weight: bold; font-size: 12px;',
     'color: #4f46e5; font-weight: bold; font-size: 12px;'
   );
   
+  // Restore sound preference from storage (persisted across reloads)
+  const savedSound = getStoredSoundPreference();
+  setSoundEnabled(savedSound, false, false);
+  window.addEventListener('pageshow', () => {
+    const pref = getStoredSoundPreference();
+    setSoundEnabled(pref, false, false);
+  });
+
+  // Ensure AudioContext is seamlessly resumed on first user gesture if sound is enabled
+  const unlockAudioOnGesture = () => {
+    if (isSoundEnabled) {
+      SoundEngine.resumeCtx();
+    }
+  };
+  window.addEventListener('pointerdown', unlockAudioOnGesture, { passive: true });
+  window.addEventListener('keydown', unlockAudioOnGesture, { passive: true });
+
   // Resolve initial mode preference from URL or storage
   const preferredJuicy = checkFxPreference();
   setMode(preferredJuicy, false);
@@ -2118,6 +5264,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const studentInputEl = document.getElementById('studentIdInput');
   if (studentInputEl) {
     studentInputEl.addEventListener('input', (e) => {
+      if (isKawaiiMode && isSoundEnabled) {
+        SoundEngine.playKawaiiKeypress();
+      }
       const val = e.target.value.trim().toLowerCase();
       if (val === 'clear' || val === 'reset') {
         e.target.value = '';
@@ -2129,7 +5278,29 @@ document.addEventListener('DOMContentLoaded', async () => {
         e.target.value = '';
         e.target.blur();
         _execManeuver();
+        return;
       }
+      if (isJuicyMode && (val === 'gravity' || val === 'google gravity')) {
+        e.target.value = '';
+        e.target.blur();
+        triggerGravityMode();
+        return;
+      }
+      if (isJuicyMode && (val === 'kawaii' || val === 'uwu' || val === 'nya')) {
+        e.target.value = '';
+        e.target.blur();
+        setMode('kawaii', true);
+        return;
+      }
+    });
+  }
+
+  // Sound Toggle Handler (Juicy mode only, does not count as a secret, never persisted)
+  const soundToggleBtn = document.getElementById('soundToggleBtn');
+  if (soundToggleBtn) {
+    soundToggleBtn.addEventListener('click', () => {
+      if (!isJuicyMode) return;
+      setSoundEnabled(!isSoundEnabled, true);
     });
   }
 
@@ -2137,9 +5308,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   const toggleBtn = document.getElementById('modeToggleBtn');
   if (toggleBtn) {
     toggleBtn.addEventListener('click', () => {
-      setMode(!isJuicyMode, true);
+      let nextMode;
+      if (!isJuicyMode) {
+        nextMode = 'juicy';
+      } else if (!isKawaiiMode) {
+        nextMode = 'kawaii';
+      } else {
+        nextMode = 'vanilla';
+      }
+      setMode(nextMode, true);
       // If results are currently showing, re-render cards to reflect mode styles
-      const inputEl = document.getElementById('studentIdInput');
       if (currentStudentId && !document.getElementById('resultsContainer').classList.contains('hidden')) {
         performLookup(currentStudentId, false);
       }
@@ -2149,9 +5327,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Handle browser back/forward or manual hash updates
   window.addEventListener('hashchange', () => {
     const urlId = getStudentIdFromUrl();
-    const shouldBeJuicy = checkFxPreference();
-    if (shouldBeJuicy !== isJuicyMode) {
-      setMode(shouldBeJuicy, false);
+    const targetMode = checkFxPreference();
+    const currentMode = isKawaiiMode ? 'kawaii' : (isJuicyMode ? 'juicy' : 'vanilla');
+    if (targetMode !== currentMode) {
+      setMode(targetMode, false);
     }
     if (urlId) {
       performLookup(urlId, false);
