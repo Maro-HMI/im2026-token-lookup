@@ -1095,6 +1095,9 @@ function setMode(modeOrJuicy, updateUrl = true) {
 
     // Telemetry & Fanfare
     if (!wasKawaii) {
+      if (!isSoundEnabled) {
+        isSoundEnabled = true;
+      }
       const { isNew, totalFound } = _unlockTelemetry('0xdm');
       const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
       _notifyTelemetry(`✨ Sparkles everywhere! Kawaii Mode unlocked! (｡♥‿♥｡)${suffix}`);
@@ -1172,6 +1175,11 @@ function setMode(modeOrJuicy, updateUrl = true) {
     if (isKawaiiMode) modeSuffix = '?kawaii';
     else if (!isJuicyMode) modeSuffix = '?vanilla';
     history.replaceState(null, '', window.location.pathname + '#' + currentStudentId + modeSuffix);
+  }
+
+  // If results are currently showing, re-render cards to reflect mode styles
+  if (currentStudentId && document.getElementById('resultsContainer') && !document.getElementById('resultsContainer').classList.contains('hidden')) {
+    performLookup(currentStudentId, false);
   }
 }
 
@@ -1667,8 +1675,10 @@ async function performLookup(rawId, updateUrl = true) {
 
     // Update URL hash for bookmarking and browser title
     if (updateUrl) {
-      const hashStr = isJuicyMode ? studentId : `${studentId}?vanilla`;
-      history.replaceState(null, '', window.location.pathname + '#' + hashStr);
+      let modeSuffix = '';
+      if (isKawaiiMode) modeSuffix = '?kawaii';
+      else if (!isJuicyMode) modeSuffix = '?vanilla';
+      history.replaceState(null, '', window.location.pathname + '#' + studentId + modeSuffix);
     }
     document.title = `IM 2026 Tokens — ${studentId}`;
 
@@ -1782,7 +1792,7 @@ function _getDiscoveredTelemetry() {
     const arr = JSON.parse(raw);
     if (!Array.isArray(arr)) return new Set();
 
-    // Validate strictly against active manifest IDs to automatically purge retired/legacy secrets (e.g. 0xdm)
+    // Validate strictly against active manifest IDs to automatically purge retired/legacy secrets
     const validIds = new Set(_0xM.map(m => m.id));
     const sanitized = arr.filter(id => validIds.has(id));
 
@@ -2403,6 +2413,7 @@ function _setupGuardianCatListener() {
   window.pet = window.petCat;
   window.cat = window.petCat;
   window.guardianCat = { pet: window.petCat };
+  window.guardianCat.toString = () => { window.petCat(); return '🐱 *happy purr*'; };
   window.petCat.pet = window.petCat;
   window.petCat.toString = () => { window.petCat(); return '🐱 *happy purr*'; };
 }
@@ -3890,10 +3901,11 @@ function init3DVoidModule() {
       if (notEnrolled) notEnrolled.classList.add('hidden');
       const enrolled = clone.querySelector('#getxrEnrolledContent');
       if (enrolled) enrolled.classList.remove('hidden');
+      const isResultsVisible = currentStudentId && document.getElementById('resultsContainer') && !document.getElementById('resultsContainer').classList.contains('hidden');
       const balance = clone.querySelector('#getxrBalance');
-      if (balance && (!balance.textContent || balance.textContent === '0.0')) balance.textContent = '2.0';
+      if (balance && (!isResultsVisible || !balance.textContent.trim())) balance.textContent = '2.0';
       const badge = clone.querySelector('#getxrStatusBadge');
-      if (badge) {
+      if (badge && (!isResultsVisible || !badge.textContent.trim())) {
         badge.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-medium shrink-0 bg-blue-100 text-blue-700';
         badge.textContent = 'Enrolled';
       }
@@ -3918,10 +3930,11 @@ function init3DVoidModule() {
       if (notEnrolled) notEnrolled.classList.add('hidden');
       const enrolled = clone.querySelector('#threedmaEnrolledContent');
       if (enrolled) enrolled.classList.remove('hidden');
+      const isResultsVisible = currentStudentId && document.getElementById('resultsContainer') && !document.getElementById('resultsContainer').classList.contains('hidden');
       const balance = clone.querySelector('#threedmaBalance');
-      if (balance && (!balance.textContent || balance.textContent === '0.0')) balance.textContent = '2.0';
+      if (balance && (!isResultsVisible || !balance.textContent.trim())) balance.textContent = '2.0';
       const badge = clone.querySelector('#threedmaStatusBadge');
-      if (badge) {
+      if (badge && (!isResultsVisible || !badge.textContent.trim())) {
         badge.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-medium shrink-0 bg-emerald-100 text-emerald-700';
         badge.textContent = 'Enrolled';
       }
@@ -4703,9 +4716,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Handle browser back/forward or manual hash updates
   window.addEventListener('hashchange', () => {
     const urlId = getStudentIdFromUrl();
-    const shouldBeJuicy = checkFxPreference();
-    if (shouldBeJuicy !== isJuicyMode) {
-      setMode(shouldBeJuicy, false);
+    const targetMode = checkFxPreference();
+    const currentMode = isKawaiiMode ? 'kawaii' : (isJuicyMode ? 'juicy' : 'vanilla');
+    if (targetMode !== currentMode) {
+      setMode(targetMode, false);
     }
     if (urlId) {
       performLookup(urlId, false);
