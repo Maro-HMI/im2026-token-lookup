@@ -3924,6 +3924,7 @@ function init3DVoidModule() {
     initCosmicCatPosition();
     maxAltitudeReached = 0;
     hasEnteredOrbitSoundPlayed = false;
+    _currentTierIndex = 0;
 
     SoundEngine.playVoidBreakout();
 
@@ -3995,6 +3996,7 @@ function init3DVoidModule() {
     camVy = 0;
     maxAltitudeReached = 0;
     hasEnteredOrbitSoundPlayed = false;
+    _currentTierIndex = 0;
 
     // Reset atmospheric visual state
     document.body.style.removeProperty('--void-bg');
@@ -4165,6 +4167,12 @@ function init3DVoidModule() {
           justPressedJump = false;
           camVy = Math.max(camVy + 6.5, 11.0);
           camVy = Math.min(camVy, 16.0);
+
+          const maxCeiling = getSpaceCeiling();
+          const catAlt = getCatAltitude();
+          if (camY >= maxCeiling - 15 && catAlt > maxCeiling) {
+            triggerCantCatchMeToast();
+          }
           
           if (isKawaiiMode) {
             SoundEngine.playKawaiiBoing();
@@ -4189,7 +4197,7 @@ function init3DVoidModule() {
 
         // Cap max altitude ceiling
         const maxCeiling = getSpaceCeiling();
-        if (camY > maxCeiling) {
+        if (camY >= maxCeiling) {
           camY = maxCeiling;
           camVy = Math.min(camVy, 0);
         }
@@ -4304,17 +4312,37 @@ function init3DVoidModule() {
 
   // 7. Cosmic Guardian Cat (0xbk) Interaction
   let isCatFleeing = false;
+  let lastCantCatchMeTime = 0;
+
+  function triggerCantCatchMeToast() {
+    const now = performance.now();
+    if (now - lastCantCatchMeTime < 2500) return;
+    lastCantCatchMeTime = now;
+    _notifyTelemetry("Can't catch me ~nya");
+    SoundEngine.playCatPurr();
+    const faceEl = document.getElementById('cosmicCatFace');
+    if (faceEl && !isCatFleeing) {
+      faceEl.textContent = '(=^‥^=)v';
+      setTimeout(() => {
+        if (faceEl && !isCatFleeing) faceEl.textContent = '(=^･ω･^=)';
+      }, 2200);
+    }
+  }
 
   if (cosmicCat3D) {
     cosmicCat3D.addEventListener('click', (e) => {
       e.stopPropagation();
       if (isCatFleeing || cosmicCat3D.classList.contains('claimed')) return;
       const catAlt = getCatAltitude();
+      const ceiling = getSpaceCeiling();
       const catDist = Math.hypot(camX - 0, (camY - catAlt), camZ - (-160));
-      // Guard: must be within 380px distance so player cannot click from far below
-      if (catDist < 380) {
-        triggerOrbitalCatChase();
+      
+      // If player cannot currently reach the cat's altitude or is too far below
+      if (catAlt > ceiling || catDist >= 380) {
+        triggerCantCatchMeToast();
+        return;
       }
+      triggerOrbitalCatChase();
     });
   }
 
@@ -4425,22 +4453,36 @@ function init3DVoidModule() {
     }, 380);
   }
 
-  // Altitude Tiers & Dynamic Visuals
+  // Altitude Tiers & Dynamic Visuals (with hysteresis to eliminate boundary flickering)
+  let _currentTierIndex = 0;
+  const TIER_THRESHOLDS = [600, 2200, 4900, 7200, 9200];
+  const TIER_NAMES_KAWAII = [
+    'Cotton Ground-nya 🌸',
+    'Candy Clouds ~desu ☁️',
+    'Pastel Sky nya~ ✨',
+    'Cosmic Stardust nya~ 🌌',
+    'Starry Dream ~desu 🌟',
+    'Infinite Cosmos nya~ 🚀'
+  ];
+  const TIER_NAMES_DEFAULT = [
+    'Ground Studio',
+    'Troposphere',
+    'Stratosphere',
+    'Mesosphere',
+    'Thermosphere',
+    'Deep Orbit'
+  ];
+
   function getAltitudeTier(y) {
-    if (isKawaiiMode) {
-      if (y < 500) return { tier: 0, name: 'Cotton Ground-nya 🌸' };
-      if (y < 2000) return { tier: 1, name: 'Candy Clouds ~desu ☁️' };
-      if (y < 4500) return { tier: 2, name: 'Pastel Sky nya~ ✨' };
-      if (y < 7000) return { tier: 3, name: 'Cosmic Stardust nya~ 🌌' };
-      if (y < 9000) return { tier: 4, name: 'Starry Dream ~desu 🌟' };
-      return { tier: 5, name: 'Infinite Cosmos nya~ 🚀' };
+    const HYSTERESIS = 40; // 40m deadband eliminates boundary flickering
+    while (_currentTierIndex < TIER_THRESHOLDS.length && y > TIER_THRESHOLDS[_currentTierIndex] + HYSTERESIS) {
+      _currentTierIndex++;
     }
-    if (y < 500) return { tier: 0, name: 'Ground Studio' };
-    if (y < 2000) return { tier: 1, name: 'Troposphere' };
-    if (y < 4500) return { tier: 2, name: 'Stratosphere' };
-    if (y < 7000) return { tier: 3, name: 'Mesosphere' };
-    if (y < 9000) return { tier: 4, name: 'Thermosphere' };
-    return { tier: 5, name: 'Deep Orbit' };
+    while (_currentTierIndex > 0 && y < TIER_THRESHOLDS[_currentTierIndex - 1] - HYSTERESIS) {
+      _currentTierIndex--;
+    }
+    const names = isKawaiiMode ? TIER_NAMES_KAWAII : TIER_NAMES_DEFAULT;
+    return { tier: _currentTierIndex, name: names[_currentTierIndex] };
   }
 
   function getAtmosphericBgColor(y) {
@@ -4573,16 +4615,30 @@ function init3DVoidModule() {
         _lastAltimeterZone = name;
         altimeterZone.textContent = name;
       }
-      const roundY = Math.round(y);
+      const maxCeiling = getSpaceCeiling();
+      // Snap to exact ceiling within 2.0m to eliminate integer jitter (e.g. 4499 vs 4500)
+      const displayY = (maxCeiling - y <= 2.0 && y >= maxCeiling - 10) ? maxCeiling : y;
+      const roundY = Math.round(displayY);
       if (altimeterValue && roundY !== _lastAltimeterRoundY) {
         _lastAltimeterRoundY = roundY;
         altimeterValue.textContent = roundY.toLocaleString();
       }
       if (altimeterClimbArrow) {
-        const isDesc = vy < -1.0;
-        if (isDesc !== _lastClimbArrowDesc) {
-          _lastClimbArrowDesc = isDesc;
-          if (isDesc) {
+        const atCeiling = maxCeiling - y <= 4.0;
+        let shouldDescend = false;
+        if (!atCeiling) {
+          if (_lastClimbArrowDesc) {
+            // Already descending: stay descending until upward impulse is established
+            shouldDescend = vy < 0.6;
+          } else {
+            // Climbing: stay climbing until clear downward velocity is established
+            shouldDescend = vy < -2.2;
+          }
+        }
+
+        if (shouldDescend !== _lastClimbArrowDesc) {
+          _lastClimbArrowDesc = shouldDescend;
+          if (shouldDescend) {
             altimeterClimbArrow.classList.add('descending');
           } else {
             altimeterClimbArrow.classList.remove('descending');
@@ -4590,8 +4646,7 @@ function init3DVoidModule() {
         }
       }
       if (altimeterGaugeFill) {
-        const ceiling = getSpaceCeiling();
-        const pct = Math.min(100, Math.max(0, (y / ceiling) * 100)).toFixed(1);
+        const pct = Math.min(100, Math.max(0, (displayY / maxCeiling) * 100)).toFixed(1);
         if (pct !== _lastGaugePct) {
           _lastGaugePct = pct;
           altimeterGaugeFill.style.width = `${pct}%`;

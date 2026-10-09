@@ -1105,7 +1105,7 @@ body.in-the-void #voidAltimeter.visible {
   border-radius: 0.875rem;
   padding: 0.5rem 0.85rem;
   box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.4);
-  min-width: 155px;
+  min-width: 175px;
   user-select: none;
 }
 
@@ -1127,6 +1127,7 @@ body.in-the-void #voidAltimeter.visible {
   color: #38bdf8;
   border: 1px solid rgba(56, 189, 248, 0.3);
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .altimeter-climb-arrow {
@@ -1155,6 +1156,7 @@ body.in-the-void #voidAltimeter.visible {
 
 .altimeter-value {
   font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
   font-size: 1.125rem;
   font-weight: 800;
   color: #ffffff;
