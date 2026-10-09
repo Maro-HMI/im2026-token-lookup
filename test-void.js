@@ -731,6 +731,40 @@ const SoundEngine = (() => {
       playNoiseBurst(0.022, 1100, 'bandpass', 1.8, 0.04 + norm * 0.06, 0);
     },
 
+    playCardKick(intensity = 1.0) {
+      if (!canPlay()) return;
+      const now = performance.now();
+      if (now - lastPhysicsBounceSoundTime < 70) return;
+      lastPhysicsBounceSoundTime = now;
+
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const norm = Math.max(0.4, Math.min(2.0, intensity));
+
+        // 1. Meaty low-end foot impact thump (150Hz -> 36Hz)
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(140 * norm, t0);
+        osc.frequency.exponentialRampToValueAtTime(36, t0 + 0.12);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.001, t0);
+        gain.gain.linearRampToValueAtTime(0.26 * norm, t0 + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.14);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.15);
+
+        // 2. High-frequency leather-on-card contact slap
+        playNoiseBurst(0.035, 1400, 'bandpass', 2.0, 0.12 * norm, 0);
+
+        // 3. Sliding / scraping texture
+        playNoiseBurst(0.07, 650, 'lowpass', 1.0, 0.05 * norm, 0.015);
+      });
+    },
+
     playGravityRestore() {
       if (!canPlay()) return;
       withCtx((ctx) => {
@@ -2756,7 +2790,7 @@ function init3DVoidModule() {
       }
       if (e.key === 'g' || e.key === 'G') {
         e.preventDefault();
-        toggleVoidZeroGravity();
+        toggleVoidGravityMode();
         return;
       }
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -2908,11 +2942,17 @@ function init3DVoidModule() {
       voidCloudContainer.style.display = 'none';
     }
 
-    // Reset Zero-G state
-    if (isZeroGravityActive) {
-      isZeroGravityActive = false;
-      const guideSpan = document.getElementById('voidZeroGGuide');
-      if (guideSpan) guideSpan.innerHTML = `Zero-G: <span class="kbd-pill">G</span>`;
+    // Reset Void Gravity mode state
+    if (isVoidGravityActive) {
+      const container = document.getElementById('voidPhysicsContainer');
+      if (container) container.innerHTML = '';
+      const pageCard = document.getElementById('pageCard');
+      if (pageCard) {
+        pageCard.style.opacity = '1';
+        pageCard.style.pointerEvents = '';
+      }
+      voidPhysicsBodies = [];
+      isVoidGravityActive = false;
     }
 
     // Cleanly flush fx canvas and particle queue
@@ -3063,8 +3103,8 @@ function init3DVoidModule() {
       }
 
       if (!isGrounded || camVy > 0) {
-        // Atmospheric thinning: gravity thins out as altitude increases (or float effortlessly in Zero-G)
-        const baseGrav = isZeroGravityActive ? 0.08 : 0.85;
+        // Atmospheric thinning: gravity thins out as altitude increases
+        const baseGrav = 0.85;
         const grav = baseGrav * (1.0 - 0.55 * Math.min(1.0, camY / 6000.0));
         camY += camVy;
         camVy -= grav;
@@ -3139,6 +3179,11 @@ function init3DVoidModule() {
         if (catDist < 280) {
           triggerOrbitalCatUnlock();
         }
+      }
+
+      // Update 3D Void Physics Slabs if Gravity Mode is active
+      if (isVoidGravityActive) {
+        updateVoidPhysicsBodies(moveX, moveZ, isRunning, inputLen);
       }
 
       applyWorldTransform();
@@ -3427,38 +3472,448 @@ function init3DVoidModule() {
 
     if (!animFrameId) animateParticles();
   }
+
+  // ==========================================================================
+  // 3D Void Gravity Mode (Secret #12: 0xcl "Gravity Mode") — Physics Slabs & Kicking
+  // ==========================================================================
+  let isVoidGravityActive = false;
+  let voidPhysicsBodies = [];
+
+  function spawnKickDustSparks(worldX, worldY, worldZ) {
+    if (!canvas || !ctx || !isJuicyMode) return;
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight * 0.72;
+    const palette = ['#60a5fa', '#38bdf8', '#fbbf24', '#ffffff', '#94a3b8'];
+    for (let i = 0; i < 14; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 3.5 + Math.random() * 6.5;
+      particles.push({
+        x: cx + (Math.random() - 0.5) * 120,
+        y: cy + (Math.random() - 0.5) * 40,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed * 0.45 - 2.2,
+        size: 2.2 + Math.random() * 2.8,
+        color: palette[Math.floor(Math.random() * palette.length)],
+        alpha: 1.0,
+        decay: 0.045,
+        shape: Math.random() > 0.5 ? 'diamond' : 'circle',
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.22
+      });
+    }
+    if (!animFrameId) animateParticles();
+  }
+
+  function toggleVoidGravityMode() {
+    if (!isJuicyMode) {
+      _notifyTelemetry('Switch to Juicy Mode to unlock secrets!');
+      return;
+    }
+    if (isVoidGravityActive) {
+      restoreVoidGravityMode();
+    } else {
+      activateVoidGravityMode();
+    }
+  }
+
+  function activateVoidGravityMode() {
+    if (isVoidGravityActive) return;
+    isVoidGravityActive = true;
+
+    const { isNew, totalFound } = _unlockTelemetry('0xcl');
+    const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
+    _notifyTelemetry(`Sir Isaac Newton has entered The Void! Gravity active. [G to restore]${suffix}`);
+    SoundEngine.playGravityDrop();
+
+    const pageCard = document.getElementById('pageCard');
+    const container = document.getElementById('voidPhysicsContainer');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const slabs = [];
+
+    // 1. Header nav bar
+    const origHeader = document.querySelector('#pageFront > header');
+    if (origHeader) {
+      const clone = origHeader.cloneNode(true);
+      clone.className = 'px-4 py-2 bg-white/95 backdrop-blur-md rounded-xl shadow-xs border border-slate-200';
+      slabs.push({
+        id: 'header',
+        content: clone,
+        w: 780,
+        h: 56,
+        x: 0,
+        y: -350,
+        z: 0,
+        radius: 240,
+        floorY: 495
+      });
+    }
+
+    // 2. Hero title banner
+    const origHero = document.querySelector('#mainContainer > div.text-center');
+    if (origHero) {
+      const clone = origHero.cloneNode(true);
+      clone.className = 'p-4 bg-white/95 rounded-xl shadow-xs border border-slate-200 text-center';
+      slabs.push({
+        id: 'hero',
+        content: clone,
+        w: 460,
+        h: 92,
+        x: 0,
+        y: -250,
+        z: 0,
+        radius: 170,
+        floorY: 492
+      });
+    }
+
+    // 3. Search form
+    const origForm = document.getElementById('tokenForm');
+    if (origForm) {
+      const clone = origForm.cloneNode(true);
+      clone.className = 'p-3 bg-white rounded-xl shadow-xs';
+      slabs.push({
+        id: 'search',
+        content: clone,
+        w: 440,
+        h: 105,
+        x: 0,
+        y: -135,
+        z: 0,
+        radius: 160,
+        floorY: 492
+      });
+    }
+
+    // 4. Easter Egg from back
+    const origEgg = document.getElementById('easterEgg3D');
+    if (origEgg) {
+      const clone = origEgg.cloneNode(true);
+      clone.className = 'p-3 bg-slate-900/90 rounded-xl shadow-xs border border-amber-400/40 text-center text-white';
+      slabs.push({
+        id: 'egg',
+        content: clone,
+        w: 140,
+        h: 150,
+        x: 0,
+        y: -40,
+        z: -20,
+        radius: 70,
+        floorY: 480
+      });
+    }
+
+    // 5. GETXR Card
+    const origGetxr = document.getElementById('cardGetxr');
+    if (origGetxr) {
+      const clone = origGetxr.cloneNode(true);
+      const notEnrolled = clone.querySelector('#getxrNotEnrolled');
+      if (notEnrolled) notEnrolled.classList.add('hidden');
+      const enrolled = clone.querySelector('#getxrEnrolledContent');
+      if (enrolled) enrolled.classList.remove('hidden');
+      const balance = clone.querySelector('#getxrBalance');
+      if (balance && (!balance.textContent || balance.textContent === '0.0')) balance.textContent = '2.0';
+      const badge = clone.querySelector('#getxrStatusBadge');
+      if (badge) {
+        badge.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-medium shrink-0 bg-blue-100 text-blue-700';
+        badge.textContent = 'Enrolled';
+      }
+      slabs.push({
+        id: 'getxr',
+        content: clone,
+        w: 380,
+        h: 320,
+        x: -205,
+        y: 80,
+        z: 0,
+        radius: 160,
+        floorY: 485
+      });
+    }
+
+    // 6. 3DMA Card
+    const orig3dma = document.getElementById('card3dma');
+    if (orig3dma) {
+      const clone = orig3dma.cloneNode(true);
+      const notEnrolled = clone.querySelector('#threedmaNotEnrolled');
+      if (notEnrolled) notEnrolled.classList.add('hidden');
+      const enrolled = clone.querySelector('#threedmaEnrolledContent');
+      if (enrolled) enrolled.classList.remove('hidden');
+      const balance = clone.querySelector('#threedmaBalance');
+      if (balance && (!balance.textContent || balance.textContent === '0.0')) balance.textContent = '2.0';
+      const badge = clone.querySelector('#threedmaStatusBadge');
+      if (badge) {
+        badge.className = 'text-[11px] px-2.5 py-0.5 rounded-full font-medium shrink-0 bg-emerald-100 text-emerald-700';
+        badge.textContent = 'Enrolled';
+      }
+      slabs.push({
+        id: '3dma',
+        content: clone,
+        w: 380,
+        h: 320,
+        x: 205,
+        y: 80,
+        z: 0,
+        radius: 160,
+        floorY: 485
+      });
+    }
+
+    // 7. Quick Guide Cards
+    const guideElements = document.querySelectorAll('#mainContainer .grid > div');
+    const guideXs = [-260, 0, 260];
+    guideElements.forEach((gEl, idx) => {
+      if (idx < 3) {
+        const clone = gEl.cloneNode(true);
+        slabs.push({
+          id: `guide${idx}`,
+          content: clone,
+          w: 235,
+          h: 125,
+          x: guideXs[idx],
+          y: 275,
+          z: 0,
+          radius: 100,
+          floorY: 488
+        });
+      }
+    });
+
+    voidPhysicsBodies = slabs.map(s => {
+      const slabEl = document.createElement('div');
+      slabEl.className = 'void-physics-slab';
+      slabEl.style.width = `${s.w}px`;
+      slabEl.style.height = `${s.h}px`;
+
+      const contentWrap = document.createElement('div');
+      contentWrap.className = 'slab-content';
+      contentWrap.appendChild(s.content);
+      slabEl.appendChild(contentWrap);
+
+      container.appendChild(slabEl);
+
+      const body = {
+        id: s.id,
+        el: slabEl,
+        origX: s.x,
+        origY: s.y,
+        origZ: s.z,
+        x: s.x,
+        y: s.y,
+        z: s.z,
+        w: s.w,
+        h: s.h,
+        radius: s.radius,
+        floorY: s.floorY,
+        vx: (Math.random() - 0.5) * 5.0,
+        vy: (Math.random() * -2.2) - 1.2,
+        vz: (Math.random() - 0.5) * 5.0,
+        rotX: 0,
+        rotY: (Math.random() - 0.5) * 14.0,
+        rotZ: (Math.random() - 0.5) * 6.0,
+        vRotY: (Math.random() - 0.5) * 12.0,
+        state: 'falling'
+      };
+
+      const px = body.x - body.w / 2;
+      const py = body.y - body.h / 2;
+      slabEl.style.transform = `translate3d(${px.toFixed(1)}px, ${py.toFixed(1)}px, ${body.z.toFixed(1)}px) rotateY(${body.rotY.toFixed(1)}deg) rotateX(0deg)`;
+
+      return body;
+    });
+
+    if (pageCard) {
+      pageCard.style.opacity = '0';
+      pageCard.style.pointerEvents = 'none';
+    }
+  }
+
+  function updateVoidPhysicsBodies(moveX, moveZ, isRunning, inputLen) {
+    if (!isVoidGravityActive || voidPhysicsBodies.length === 0) return;
+
+    const playerRadius = 70;
+    const isPlayerGrounded = camY <= 140;
+
+    for (let i = 0; i < voidPhysicsBodies.length; i++) {
+      const s = voidPhysicsBodies[i];
+
+      // Gravity & Vertical Motion
+      if (s.state === 'falling') {
+        s.vy += 1.25;
+        s.y += s.vy;
+        s.x += s.vx;
+        s.z += s.vz;
+        s.rotX += (84 - s.rotX) * 0.055;
+        s.rotY += s.vRotY;
+
+        if (s.y >= s.floorY) {
+          s.y = s.floorY;
+          if (Math.abs(s.vy) > 3.0) {
+            SoundEngine.playPhysicsBounce(Math.abs(s.vy));
+            s.vy = -s.vy * 0.32;
+            s.vx *= 0.88;
+            s.vz *= 0.88;
+          } else {
+            s.vy = 0;
+            s.rotX = 84;
+            s.state = 'landed';
+            SoundEngine.playPhysicsBounce(5.5);
+          }
+        }
+      } else {
+        // Landed / Sliding state
+        s.y = s.floorY;
+        s.rotX = 84;
+        s.vx *= 0.925;
+        s.vz *= 0.925;
+        s.vRotY *= 0.91;
+
+        if (Math.abs(s.vx) < 0.04) s.vx = 0;
+        if (Math.abs(s.vz) < 0.04) s.vz = 0;
+        if (Math.abs(s.vRotY) < 0.04) s.vRotY = 0;
+
+        s.x += s.vx;
+        s.z += s.vz;
+        s.rotY += s.vRotY;
+      }
+
+      // Soft Arena bounds
+      if (Math.abs(s.x) > 2200) {
+        s.vx = -s.vx * 0.5;
+        s.x = Math.sign(s.x) * 2200;
+      }
+      if (Math.abs(s.z) > 2200) {
+        s.vz = -s.vz * 0.5;
+        s.z = Math.sign(s.z) * 2200;
+      }
+
+      // Player Collision & Kicking
+      if (isPlayerGrounded) {
+        const dx = s.x - camX;
+        const dz = s.z - camZ;
+        const dist = Math.hypot(dx, dz);
+        const minDist = playerRadius + s.radius;
+
+        if (dist < minDist) {
+          const nx = dist > 0.001 ? dx / dist : 0;
+          const nz = dist > 0.001 ? dz / dist : 1;
+          const overlap = minDist - dist;
+
+          s.x += nx * overlap;
+          s.z += nz * overlap;
+
+          const playerSpeed = Math.hypot(moveX, moveZ);
+          if (inputLen > 0 || playerSpeed > 0.5) {
+            // Player kicked the card!
+            const kickPower = isRunning ? 32.0 : 18.0;
+            s.vx += nx * kickPower + moveX * 0.95;
+            s.vz += nz * kickPower + moveZ * 0.95;
+            s.vRotY += (Math.random() - 0.5) * (isRunning ? 34.0 : 20.0);
+            s.state = 'falling';
+            s.vy = isRunning ? -5.5 : -3.2; // hop into air
+            SoundEngine.playCardKick(isRunning ? 1.5 : 1.0);
+            spawnKickDustSparks(s.x, s.floorY, s.z);
+          } else {
+            // Stationary collision
+            s.vx += nx * 5.0;
+            s.vz += nz * 5.0;
+            s.vRotY += (Math.random() - 0.5) * 8.0;
+            SoundEngine.playCardKick(0.55);
+          }
+        }
+      }
+    }
+
+    // Slab-to-Slab Carom (Billiards collisions)
+    for (let i = 0; i < voidPhysicsBodies.length; i++) {
+      for (let j = i + 1; j < voidPhysicsBodies.length; j++) {
+        const s1 = voidPhysicsBodies[i];
+        const s2 = voidPhysicsBodies[j];
+        const dx = s2.x - s1.x;
+        const dz = s2.z - s1.z;
+        const dist = Math.hypot(dx, dz);
+        const minDist = s1.radius + s2.radius;
+
+        if (dist < minDist && dist > 0.01) {
+          const overlap = minDist - dist;
+          const nx = dx / dist;
+          const nz = dz / dist;
+
+          s1.x -= nx * overlap * 0.5;
+          s1.z -= nz * overlap * 0.5;
+          s2.x += nx * overlap * 0.5;
+          s2.z += nz * overlap * 0.5;
+
+          const relVx = s1.vx - s2.vx;
+          const relVz = s1.vz - s2.vz;
+          const impulse = (relVx * nx + relVz * nz) * 0.5;
+
+          if (impulse > 0.5) {
+            s1.vx -= nx * impulse;
+            s1.vz -= nz * impulse;
+            s2.vx += nx * impulse;
+            s2.vz += nz * impulse;
+            SoundEngine.playPhysicsBounce(Math.min(14, impulse * 3));
+          }
+        }
+      }
+    }
+
+    // Render Transforms
+    for (let i = 0; i < voidPhysicsBodies.length; i++) {
+      const s = voidPhysicsBodies[i];
+      const px = s.x - s.w / 2;
+      const py = s.y - s.h / 2;
+      const pz = s.z;
+      s.el.style.transform = `translate3d(${px.toFixed(1)}px, ${py.toFixed(1)}px, ${pz.toFixed(1)}px) rotateY(${s.rotY.toFixed(1)}deg) rotateX(${s.rotX.toFixed(1)}deg) rotateZ(${s.rotZ.toFixed(1)}deg)`;
+    }
+  }
+
+  function restoreVoidGravityMode() {
+    if (!isVoidGravityActive) return;
+    isVoidGravityActive = false;
+    SoundEngine.playGravityRestore();
+
+    const container = document.getElementById('voidPhysicsContainer');
+    const pageCard = document.getElementById('pageCard');
+
+    voidPhysicsBodies.forEach(s => {
+      s.el.classList.add('restoring');
+      const px = s.origX - s.w / 2;
+      const py = s.origY - s.h / 2;
+      const pz = s.origZ;
+      s.el.style.transform = `translate3d(${px.toFixed(1)}px, ${py.toFixed(1)}px, ${pz.toFixed(1)}px) rotateY(0deg) rotateX(0deg) rotateZ(0deg)`;
+      s.el.style.opacity = '0.9';
+    });
+
+    setTimeout(() => {
+      if (container) container.innerHTML = '';
+      voidPhysicsBodies = [];
+      if (pageCard) {
+        pageCard.style.transition = 'opacity 0.4s ease';
+        pageCard.style.opacity = '1';
+        pageCard.style.pointerEvents = '';
+        setTimeout(() => {
+          if (pageCard) pageCard.style.transition = '';
+        }, 420);
+      }
+      _notifyTelemetry('Standard Gravity RESTORED. Monolith assembled.');
+    }, 840);
+  }
+
+  window.toggleVoidGravityMode = toggleVoidGravityMode;
 }
 
 // ==========================================================================
-// Gravity Collapse System (Secret #12: 0xcl "Gravity Mode") & Void Zero-G
+// Gravity Collapse System (Secret #12: 0xcl "Gravity Mode") — 2D Fallback
 // ==========================================================================
 
 let isGravityModeActive = false;
-let isZeroGravityActive = false;
 let gravityBodies = [];
 let gravityAnimationId = null;
 let draggedBody = null;
 let origPageMinHeight = '';
-
-function toggleVoidZeroGravity() {
-  if (!isJuicyMode) return;
-  isZeroGravityActive = !isZeroGravityActive;
-  SoundEngine.playZeroGToggle(isZeroGravityActive);
-
-  const guideSpan = document.getElementById('voidZeroGGuide');
-  if (guideSpan) {
-    if (isZeroGravityActive) {
-      guideSpan.innerHTML = `Zero-G: <span class="kbd-pill text-amber-300 border-amber-400/50">ON [G]</span>`;
-    } else {
-      guideSpan.innerHTML = `Zero-G: <span class="kbd-pill">G</span>`;
-    }
-  }
-
-  const { isNew, totalFound } = _unlockTelemetry('0xcl');
-  const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
-  const statusMsg = isZeroGravityActive ? 'Zero Gravity ENGAGED! Float into orbit.' : 'Standard Gravity RESTORED.';
-  _notifyTelemetry(`${statusMsg}${suffix}`);
-}
 
 function _collectGravityElements() {
   const elements = [];
@@ -3701,9 +4156,11 @@ function triggerGravityMode() {
     return;
   }
 
-  // If in The Void, toggle Zero-G mode
+  // If in The Void, toggle 3D Void Gravity mode
   if (isInTheVoid) {
-    toggleVoidZeroGravity();
+    if (typeof toggleVoidGravityMode === 'function') {
+      toggleVoidGravityMode();
+    }
     return;
   }
 
