@@ -21,6 +21,7 @@ const SoundEngine = (() => {
   let chargeGain = null;
   let lastChargeSparkTime = 0;
   let chargeStartedAt = 0;
+  let lastPhysicsBounceSoundTime = 0;
 
   function getCtx() {
     if (!audioCtx) {
@@ -679,6 +680,92 @@ const SoundEngine = (() => {
       notes.forEach((f, idx) => {
         playTone({ freqStart: f, type: 'triangle', duration: 0.34, gainPeak: 0.10, delay: 0.02 + idx * 0.045, filterFreq: 5000 });
       });
+    },
+
+    // 16. Gravity Mode (0xcl) — Collapse Drop, Physics Impacts & Anti-Gravity Restore
+    playGravityDrop() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(260, t0);
+        osc.frequency.exponentialRampToValueAtTime(36, t0 + 0.65);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(550, t0);
+        filter.frequency.linearRampToValueAtTime(110, t0 + 0.65);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.linearRampToValueAtTime(0.24, t0 + 0.035);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.65);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.7);
+
+        playNoiseBurst(0.24, 480, 'lowpass', 1.1, 0.14, 0.02);
+      });
+    },
+
+    playPhysicsBounce(impactSpeed = 10) {
+      if (!canPlay()) return;
+      const now = performance.now();
+      if (now - lastPhysicsBounceSoundTime < 60) return;
+      lastPhysicsBounceSoundTime = now;
+
+      const norm = Math.min(1.0, impactSpeed / 20.0);
+      const toneFreq = 160 + (1 - norm) * 120;
+      playTone({
+        freqStart: toneFreq,
+        freqEnd: toneFreq * 0.55,
+        type: 'triangle',
+        duration: 0.045,
+        gainPeak: 0.05 + norm * 0.08,
+        filterFreq: 800 + norm * 600
+      });
+      playNoiseBurst(0.022, 1100, 'bandpass', 1.8, 0.04 + norm * 0.06, 0);
+    },
+
+    playGravityRestore() {
+      if (!canPlay()) return;
+      withCtx((ctx) => {
+        const t0 = ctx.currentTime;
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(50, t0);
+        osc.frequency.exponentialRampToValueAtTime(460, t0 + 0.45);
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.linearRampToValueAtTime(0.18, t0 + 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.52);
+
+        const notes = [523.25, 659.25, 783.99, 1046.5];
+        notes.forEach((f, idx) => {
+          playTone({ freqStart: f, type: 'triangle', duration: 0.28, gainPeak: 0.085, delay: 0.14 + idx * 0.06, filterFreq: 4000 });
+        });
+      });
+    },
+
+    playZeroGToggle(active) {
+      if (!canPlay()) return;
+      if (active) {
+        playNoiseBurst(0.28, 1800, 'bandpass', 1.4, 0.14, 0);
+        playTone({ freqStart: 220, freqEnd: 880, type: 'sine', duration: 0.35, gainPeak: 0.09, filterFreq: 2600 });
+      } else {
+        playNoiseBurst(0.18, 750, 'lowpass', 1.2, 0.14, 0);
+        playTone({ freqStart: 380, freqEnd: 120, type: 'sawtooth', duration: 0.25, gainPeak: 0.10, filterFreq: 900 });
+      }
     }
   };
 })();
@@ -1359,6 +1446,14 @@ function handleFormSubmit(e) {
     return;
   }
 
+  // Gravity Mode trigger (matches 'gravity' or 'google gravity' in Juicy mode)
+  if (isJuicyMode && (lower === 'gravity' || lower === 'google gravity')) {
+    inputEl.value = '';
+    inputEl.blur();
+    triggerGravityMode();
+    return;
+  }
+
   performLookup(rawId, true);
 }
 
@@ -1383,7 +1478,7 @@ function handleClearSearch() {
 
 const _K_STORE = atob('aW1fdG9rZW5zX2Rpc2NvdmVyZWRfZWdncw==');
 
-// Subsystem telemetry manifest (11 secrets)
+// Subsystem telemetry manifest (12 secrets)
 const _0xM = [
   { id: '0x1a', name: atob('VG9rZW4gQ29pbiBGbGlw') },       // Token Coin Flip
   { id: '0x2b', name: atob('RG8gYSBCYXJyZWwgUm9sbA==') },   // Do a Barrel Roll
@@ -1395,7 +1490,8 @@ const _0xM = [
   { id: '0x8h', name: atob('VGhlIEVhc3RlciBFZ2c=') },       // The Easter Egg
   { id: '0x9i', name: atob('VG9rZW4gT3ZlcmNsb2Nr') },      // Token Overclock
   { id: '0xaj', name: atob('R3VhcmRpYW4ncyBCbGVzc2luZw==') }, // Guardian's Blessing
-  { id: '0xbk', name: atob('T3JiaXRhbCBBc2NlbnQ=') }       // Orbital Ascent
+  { id: '0xbk', name: atob('T3JiaXRhbCBBc2NlbnQ=') },       // Orbital Ascent
+  { id: '0xcl', name: atob('R3Jhdml0eSBNb2Rl') }            // Gravity Mode
 ];
 
 function _getDiscoveredTelemetry() {
@@ -1447,7 +1543,7 @@ function _clearDiscoveredTelemetry() {
   _updateTelemetryUI();
   if (isJuicyMode) {
     SoundEngine.playTelemetryReset();
-    _notifyTelemetry(atob('U2VjcmV0cyBjb3VudGVyIHJlc2V0OiAwLzEx'));
+    _notifyTelemetry(atob('U2VjcmV0cyBjb3VudGVyIHJlc2V0OiAwLzEy'));
   }
 }
 
@@ -2658,6 +2754,11 @@ function init3DVoidModule() {
           justPressedJump = true;
         }
       }
+      if (e.key === 'g' || e.key === 'G') {
+        e.preventDefault();
+        toggleVoidZeroGravity();
+        return;
+      }
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
       }
@@ -2667,7 +2768,21 @@ function init3DVoidModule() {
       return;
     }
 
+    if (isGravityModeActive) {
+      if (e.key === 'Escape' || e.key === 'g' || e.key === 'G') {
+        e.preventDefault();
+        restoreGravityMode();
+        return;
+      }
+    }
+
     if (isInputFocused()) return; // Never trigger while typing in student number or using buttons
+    if (isGravityModeActive) return; // Do not trigger void hold while in gravity mode
+    if (e.key === 'g' || e.key === 'G') {
+      e.preventDefault();
+      triggerGravityMode();
+      return;
+    }
     if (!isTargetKey(e.key, e.code)) return;
     if (_kPos >= 2) return; // Do not start Void hold while user is actively entering Konami Code
 
@@ -2791,6 +2906,13 @@ function init3DVoidModule() {
     if (voidCloudContainer) {
       voidCloudContainer.style.opacity = '0';
       voidCloudContainer.style.display = 'none';
+    }
+
+    // Reset Zero-G state
+    if (isZeroGravityActive) {
+      isZeroGravityActive = false;
+      const guideSpan = document.getElementById('voidZeroGGuide');
+      if (guideSpan) guideSpan.innerHTML = `Zero-G: <span class="kbd-pill">G</span>`;
     }
 
     // Cleanly flush fx canvas and particle queue
@@ -2941,8 +3063,9 @@ function init3DVoidModule() {
       }
 
       if (!isGrounded || camVy > 0) {
-        // Atmospheric thinning: gravity thins out as altitude increases
-        const grav = 0.85 * (1.0 - 0.55 * Math.min(1.0, camY / 6000.0));
+        // Atmospheric thinning: gravity thins out as altitude increases (or float effortlessly in Zero-G)
+        const baseGrav = isZeroGravityActive ? 0.08 : 0.85;
+        const grav = baseGrav * (1.0 - 0.55 * Math.min(1.0, camY / 6000.0));
         camY += camVy;
         camVy -= grav;
 
@@ -3290,6 +3413,437 @@ function init3DVoidModule() {
   }
 }
 
+// ==========================================================================
+// Gravity Collapse System (Secret #12: 0xcl "Gravity Mode") & Void Zero-G
+// ==========================================================================
+
+let isGravityModeActive = false;
+let isZeroGravityActive = false;
+let gravityBodies = [];
+let gravityAnimationId = null;
+let draggedBody = null;
+let origPageMinHeight = '';
+
+function toggleVoidZeroGravity() {
+  if (!isJuicyMode) return;
+  isZeroGravityActive = !isZeroGravityActive;
+  SoundEngine.playZeroGToggle(isZeroGravityActive);
+
+  const guideSpan = document.getElementById('voidZeroGGuide');
+  if (guideSpan) {
+    if (isZeroGravityActive) {
+      guideSpan.innerHTML = `Zero-G: <span class="kbd-pill text-amber-300 border-amber-400/50">ON [G]</span>`;
+    } else {
+      guideSpan.innerHTML = `Zero-G: <span class="kbd-pill">G</span>`;
+    }
+  }
+
+  const { isNew, totalFound } = _unlockTelemetry('0xcl');
+  const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
+  const statusMsg = isZeroGravityActive ? 'Zero Gravity ENGAGED! Float into orbit.' : 'Standard Gravity RESTORED.';
+  _notifyTelemetry(`${statusMsg}${suffix}`);
+}
+
+function _collectGravityElements() {
+  const elements = [];
+  const header = document.querySelector('#pageFront > header');
+  if (header) elements.push(header);
+
+  const main = document.getElementById('mainContainer');
+  if (main) {
+    // 1. Hero title block
+    const hero = main.querySelector(':scope > div.text-center');
+    if (hero) elements.push(hero);
+
+    // 2. Search form wrapper
+    const searchWrap = main.querySelector(':scope > div.max-w-md');
+    if (searchWrap) elements.push(searchWrap);
+
+    // 3. Results elements if active
+    const resultsContainer = document.getElementById('resultsContainer');
+    if (resultsContainer && !resultsContainer.classList.contains('hidden')) {
+      const studentBar = resultsContainer.children[0];
+      const tipBar = resultsContainer.children[1];
+      const getxrCard = document.getElementById('cardGetxr');
+      const threedmaCard = document.getElementById('card3dma');
+      if (studentBar) elements.push(studentBar);
+      if (tipBar) elements.push(tipBar);
+      if (getxrCard) elements.push(getxrCard);
+      if (threedmaCard) elements.push(threedmaCard);
+    }
+
+    // 4. Quick guide section
+    const guideSection = main.querySelector(':scope > div.mt-8');
+    if (guideSection) {
+      const guideHeading = guideSection.querySelector('h4');
+      if (guideHeading) elements.push(guideHeading);
+      const guideCards = guideSection.querySelectorAll('.grid > div');
+      guideCards.forEach(card => elements.push(card));
+    }
+  }
+
+  const footer = document.querySelector('#pageFront > footer');
+  if (footer) elements.push(footer);
+
+  return elements.filter(el => {
+    const rect = el.getBoundingClientRect();
+    return rect.width > 10 && rect.height > 10;
+  });
+}
+
+function _createGravityHud() {
+  const existing = document.getElementById('gravityModeHud');
+  if (existing) existing.remove();
+
+  const hud = document.createElement('div');
+  hud.id = 'gravityModeHud';
+  hud.className = 'gravity-hud';
+  hud.innerHTML = `
+    <div class="gravity-hud-indicator"></div>
+    <div class="gravity-hud-content">
+      <span class="gravity-hud-title">Gravity Collapse Active</span>
+      <span class="gravity-hud-hint">Click &amp; throw cards!</span>
+    </div>
+    <button type="button" id="restoreGravityBtn" class="gravity-hud-btn" title="Restore Page [ESC or G]">
+      <span>Restore</span>
+      <span class="kbd-pill">ESC</span>
+    </button>
+  `;
+  document.body.appendChild(hud);
+
+  const btn = document.getElementById('restoreGravityBtn');
+  if (btn) {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      restoreGravityMode();
+    });
+  }
+}
+
+function onGravityPointerDown(e) {
+  if (e.target.closest('#restoreGravityBtn')) return;
+  const targetBody = gravityBodies.find(b => b.el === e.target || b.el.contains(e.target));
+  if (!targetBody) return;
+  draggedBody = targetBody;
+  targetBody.isDragging = true;
+  targetBody.dragOffsetX = e.clientX - targetBody.x;
+  targetBody.dragOffsetY = e.clientY - targetBody.y;
+  targetBody.lastPointerX = e.clientX;
+  targetBody.lastPointerY = e.clientY;
+  targetBody.lastPointerTime = performance.now();
+  targetBody.pointerVx = 0;
+  targetBody.pointerVy = 0;
+  targetBody.el.style.cursor = 'grabbing';
+  targetBody.el.style.zIndex = '150';
+}
+
+function onGravityPointerMove(e) {
+  if (!draggedBody) return;
+  const now = performance.now();
+  const dt = Math.max(1, now - draggedBody.lastPointerTime);
+  const instVx = (e.clientX - draggedBody.lastPointerX) / (dt / 16.6);
+  const instVy = (e.clientY - draggedBody.lastPointerY) / (dt / 16.6);
+  draggedBody.pointerVx = draggedBody.pointerVx * 0.4 + instVx * 0.6;
+  draggedBody.pointerVy = draggedBody.pointerVy * 0.4 + instVy * 0.6;
+  draggedBody.lastPointerX = e.clientX;
+  draggedBody.lastPointerY = e.clientY;
+  draggedBody.lastPointerTime = now;
+  draggedBody.x = e.clientX - draggedBody.dragOffsetX;
+  draggedBody.y = e.clientY - draggedBody.dragOffsetY;
+}
+
+function onGravityPointerUp() {
+  if (!draggedBody) return;
+  draggedBody.isDragging = false;
+  draggedBody.vx = Math.max(-28, Math.min(28, draggedBody.pointerVx));
+  draggedBody.vy = Math.max(-28, Math.min(28, draggedBody.pointerVy));
+  draggedBody.vAngle = draggedBody.vx * 0.5;
+  draggedBody.el.style.cursor = 'grab';
+  draggedBody.el.style.zIndex = '60';
+  draggedBody = null;
+}
+
+function _runGravityPhysicsLoop() {
+  if (!isGravityModeActive) return;
+
+  const floorY = window.innerHeight - 8;
+  const wallLeft = 8;
+  const wallRight = window.innerWidth - 8;
+  const gravity = 0.72;
+
+  // Stacking repulsion between bodies resting on or near floor
+  for (let i = 0; i < gravityBodies.length; i++) {
+    for (let j = i + 1; j < gravityBodies.length; j++) {
+      const b1 = gravityBodies[i];
+      const b2 = gravityBodies[j];
+      if (b1.isDragging || b2.isDragging) continue;
+      const c1x = b1.x + b1.w / 2;
+      const c1y = b1.y + b1.h / 2;
+      const c2x = b2.x + b2.w / 2;
+      const c2y = b2.y + b2.h / 2;
+      const dx = c2x - c1x;
+      const dy = c2y - c1y;
+      const minDistX = (b1.w + b2.w) * 0.42;
+      const minDistY = (b1.h + b2.h) * 0.42;
+      if (Math.abs(dx) < minDistX && Math.abs(dy) < minDistY) {
+        const overlapX = minDistX - Math.abs(dx);
+        const overlapY = minDistY - Math.abs(dy);
+        if (overlapX < overlapY) {
+          const sign = dx > 0 ? 1 : -1;
+          b1.x -= sign * overlapX * 0.2;
+          b2.x += sign * overlapX * 0.2;
+          b1.vx -= sign * 0.35;
+          b2.vx += sign * 0.35;
+        } else {
+          const sign = dy > 0 ? 1 : -1;
+          b1.y -= sign * overlapY * 0.2;
+          b2.y += sign * overlapY * 0.2;
+          b1.vy -= sign * 0.35;
+          b2.vy += sign * 0.35;
+        }
+      }
+    }
+  }
+
+  for (let i = 0; i < gravityBodies.length; i++) {
+    const b = gravityBodies[i];
+    const rad = Math.abs((b.angle * Math.PI) / 180);
+    const halfDiag = (Math.abs(Math.sin(rad) * b.w) + Math.abs(Math.cos(rad) * b.h)) / 2;
+    const halfWidth = (Math.abs(Math.cos(rad) * b.w) + Math.abs(Math.sin(rad) * b.h)) / 2;
+
+    if (b.isDragging) {
+      // While dragging, keep within viewport
+      const centerY = b.y + b.h / 2;
+      if (centerY + halfDiag > floorY) {
+        b.y = floorY - halfDiag - b.h / 2;
+      }
+    } else {
+      b.vy += gravity;
+      b.vx *= 0.992;
+      b.vAngle *= 0.985;
+      b.x += b.vx;
+      b.y += b.vy;
+      b.angle += b.vAngle;
+
+      // Floor collision
+      const centerY = b.y + b.h / 2;
+      if (centerY + halfDiag >= floorY) {
+        b.y = floorY - halfDiag - b.h / 2;
+        if (Math.abs(b.vy) > 1.8) {
+          SoundEngine.playPhysicsBounce(Math.abs(b.vy));
+        }
+        b.vy = -b.vy * b.restitution;
+        b.vx *= b.friction;
+        // Ground friction settles angle
+        b.vAngle = b.vAngle * 0.5 - (b.angle * 0.05) + (b.vx * 0.15);
+        if (Math.abs(b.vy) < 0.7 && Math.abs(b.vx) < 0.25) {
+          b.vy = 0;
+          b.vx = 0;
+          b.vAngle *= 0.7;
+        }
+      }
+
+      // Left wall collision
+      const centerX = b.x + b.w / 2;
+      if (centerX - halfWidth < wallLeft) {
+        b.x = wallLeft + halfWidth - b.w / 2;
+        b.vx = -b.vx * b.restitution;
+        b.vAngle *= 0.7;
+        if (Math.abs(b.vx) > 2.0) {
+          SoundEngine.playPhysicsBounce(Math.abs(b.vx));
+        }
+      }
+
+      // Right wall collision
+      if (centerX + halfWidth > wallRight) {
+        b.x = wallRight - halfWidth - b.w / 2;
+        b.vx = -b.vx * b.restitution;
+        b.vAngle *= 0.7;
+        if (Math.abs(b.vx) > 2.0) {
+          SoundEngine.playPhysicsBounce(Math.abs(b.vx));
+        }
+      }
+
+      // Ceiling bounce
+      if (centerY - halfDiag < 0) {
+        b.y = halfDiag - b.h / 2;
+        b.vy = -b.vy * 0.4;
+      }
+    }
+
+    const dx = b.x - b.origX;
+    const dy = b.y - b.origY;
+    b.el.style.transform = `translate3d(${dx.toFixed(2)}px, ${dy.toFixed(2)}px, 0) rotate(${b.angle.toFixed(2)}deg)`;
+  }
+
+  gravityAnimationId = requestAnimationFrame(_runGravityPhysicsLoop);
+}
+
+function triggerGravityMode() {
+  if (!isJuicyMode) {
+    _notifyTelemetry('Switch to Juicy Mode to unlock secrets!');
+    return;
+  }
+
+  // If in The Void, toggle Zero-G mode
+  if (isInTheVoid) {
+    toggleVoidZeroGravity();
+    return;
+  }
+
+  if (isGravityModeActive) {
+    restoreGravityMode();
+    return;
+  }
+
+  const { isNew, totalFound } = _unlockTelemetry('0xcl');
+  const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
+  _notifyTelemetry(`Sir Isaac Newton has entered the classroom!${suffix}`);
+
+  isGravityModeActive = true;
+  SoundEngine.playGravityDrop();
+
+  const elements = _collectGravityElements();
+  if (elements.length === 0) return;
+
+  const pageFront = document.getElementById('pageFront');
+  if (pageFront) {
+    origPageMinHeight = pageFront.style.minHeight || '';
+    pageFront.style.minHeight = `${pageFront.offsetHeight}px`;
+  }
+  document.body.style.overflow = 'hidden';
+
+  gravityBodies = elements.map(el => {
+    const rect = el.getBoundingClientRect();
+    const origStyle = {
+      position: el.style.position || '',
+      left: el.style.left || '',
+      top: el.style.top || '',
+      width: el.style.width || '',
+      height: el.style.height || '',
+      transform: el.style.transform || '',
+      transition: el.style.transition || '',
+      zIndex: el.style.zIndex || '',
+      margin: el.style.margin || '',
+      boxSizing: el.style.boxSizing || '',
+      cursor: el.style.cursor || '',
+      userSelect: el.style.userSelect || ''
+    };
+
+    const body = {
+      el,
+      origStyle,
+      origX: rect.left,
+      origY: rect.top,
+      x: rect.left,
+      y: rect.top,
+      w: rect.width,
+      h: rect.height,
+      vx: (Math.random() - 0.5) * 4.5,
+      vy: (Math.random() * -3.0) - 0.8,
+      angle: 0,
+      vAngle: (Math.random() - 0.5) * 5.0,
+      restitution: 0.38 + Math.random() * 0.15,
+      friction: 0.94,
+      isDragging: false,
+      dragOffsetX: 0,
+      dragOffsetY: 0,
+      lastPointerX: rect.left,
+      lastPointerY: rect.top,
+      lastPointerTime: performance.now(),
+      pointerVx: 0,
+      pointerVy: 0
+    };
+
+    el.style.position = 'fixed';
+    el.style.left = `${rect.left}px`;
+    el.style.top = `${rect.top}px`;
+    el.style.width = `${rect.width}px`;
+    el.style.height = `${rect.height}px`;
+    el.style.margin = '0';
+    el.style.boxSizing = 'border-box';
+    el.style.zIndex = '60';
+    el.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
+    el.style.transition = 'none';
+    el.style.cursor = 'grab';
+    el.style.userSelect = 'none';
+    el.classList.add('gravity-body');
+
+    return body;
+  });
+
+  window.addEventListener('pointerdown', onGravityPointerDown);
+  window.addEventListener('pointermove', onGravityPointerMove);
+  window.addEventListener('pointerup', onGravityPointerUp);
+  window.addEventListener('pointercancel', onGravityPointerUp);
+
+  _createGravityHud();
+  _runGravityPhysicsLoop();
+}
+
+function restoreGravityMode() {
+  if (!isGravityModeActive) return;
+  isGravityModeActive = false;
+
+  if (gravityAnimationId) {
+    cancelAnimationFrame(gravityAnimationId);
+    gravityAnimationId = null;
+  }
+
+  window.removeEventListener('pointerdown', onGravityPointerDown);
+  window.removeEventListener('pointermove', onGravityPointerMove);
+  window.removeEventListener('pointerup', onGravityPointerUp);
+  window.removeEventListener('pointercancel', onGravityPointerUp);
+
+  const hud = document.getElementById('gravityModeHud');
+  if (hud) {
+    hud.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+    hud.style.opacity = '0';
+    hud.style.transform = 'translateX(-50%) translateY(-20px)';
+    setTimeout(() => hud.remove(), 260);
+  }
+
+  SoundEngine.playGravityRestore();
+
+  gravityBodies.forEach(b => {
+    b.el.style.transition = 'transform 0.65s cubic-bezier(0.19, 1, 0.22, 1)';
+    b.el.style.transform = 'translate3d(0, 0, 0) rotate(0deg)';
+  });
+
+  setTimeout(() => {
+    gravityBodies.forEach(b => {
+      const s = b.origStyle;
+      b.el.style.position = s.position;
+      b.el.style.left = s.left;
+      b.el.style.top = s.top;
+      b.el.style.width = s.width;
+      b.el.style.height = s.height;
+      b.el.style.transform = s.transform;
+      b.el.style.transition = s.transition;
+      b.el.style.zIndex = s.zIndex;
+      b.el.style.margin = s.margin;
+      b.el.style.boxSizing = s.boxSizing;
+      b.el.style.cursor = s.cursor;
+      b.el.style.userSelect = s.userSelect;
+      b.el.classList.remove('gravity-body');
+    });
+
+    const pageFront = document.getElementById('pageFront');
+    if (pageFront) pageFront.style.minHeight = origPageMinHeight;
+    document.body.style.overflow = '';
+    gravityBodies = [];
+    draggedBody = null;
+  }, 660);
+}
+
+// DevTools console helpers for Gravity Mode
+window.gravity = function() {
+  triggerGravityMode();
+  return '🍏 Isaac Newton would like to know your location.';
+};
+window.toggleGravity = window.gravity;
+window.gravity.toString = () => { window.gravity(); return '🍏 Gravity toggled.'; };
+
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', async () => {
   initCardOrder();
@@ -3317,7 +3871,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 %c[Interactive Media 2026]%c Late Token Engine v2.0
 • WebCrypto SHA-256 local verification
 • Canvas FX & Telemetry active
-• The cat looks like it wants to be petted...`,
+• The cat looks like it wants to be petted...
+• Press 'G' or type 'gravity' if things feel too grounded...`,
     'color: #d97706; font-family: monospace; font-size: 11px; font-weight: bold; line-height: 1.25;',
     '',
     'color: #d97706; font-weight: bold; font-size: 12px;',
@@ -3354,6 +3909,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         e.target.value = '';
         e.target.blur();
         _execManeuver();
+        return;
+      }
+      if (isJuicyMode && (val === 'gravity' || val === 'google gravity')) {
+        e.target.value = '';
+        e.target.blur();
+        triggerGravityMode();
+        return;
       }
     });
   }
