@@ -2998,7 +2998,7 @@ function _setupUnderTheCListener() {
 
     const { isNew, totalFound } = _unlockTelemetry('0xen');
     const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
-    _notifyTelemetry(`🦀 Darling it's better down where it's wetter! Under the C!${suffix}`);
+    _notifyTelemetry(`🦀 Under the C! Under the C!${suffix}`);
 
     if (isSoundEnabled) {
       SoundEngine.playUnderTheSea();
