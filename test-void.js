@@ -1161,7 +1161,7 @@ function updateSoundUI() {
     }
     if (soundLabel) {
       soundLabel.className = isKawaiiMode ? 'text-[11px] font-medium text-pink-500' : 'text-[11px] font-medium text-slate-500';
-      soundLabel.textContent = isKawaiiMode ? 'Sound Off nya (´-ω-｀)' : 'Sound Off';
+      soundLabel.textContent = isKawaiiMode ? 'Sound Off nya (=^-ω-^=) 💤' : 'Sound Off';
     }
   }
 }
@@ -1292,7 +1292,7 @@ function updateKawaiiStaticTexts(active) {
   // 1. Header title & subtitle
   const headerTitle = document.querySelector('header h1');
   if (headerTitle) {
-    _saveAndSetText('headerTitle', headerTitle, 'IM 2026 Token Lookup ~desu! (✿◠‿◠)', active);
+    _saveAndSetText('headerTitle', headerTitle, 'IM 2026 Token Lookup ~desu! (ฅ^•ᴥ•^ฅ)', active);
   }
   const headerSub = document.querySelector('header .bg-slate-100');
   if (headerSub) {
@@ -1302,17 +1302,17 @@ function updateKawaiiStaticTexts(active) {
   // 2. Hero title & subtitle
   const heroTitle = document.querySelector('#mainContainer h2');
   if (heroTitle) {
-    _saveAndSetText('heroTitle', heroTitle, 'Check Late Token Balance ~desu! (✿◠‿◠)', active);
+    _saveAndSetText('heroTitle', heroTitle, 'Check Late Token Balance ~desu! (ฅ^•ᴥ•^ฅ)', active);
   }
   const heroSub = document.querySelector('#mainContainer p.text-slate-500');
   if (heroSub) {
-    _saveAndSetText('heroSub', heroSub, 'Check your late tokens, Wooclap credits & extension stars-nya! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ ~desu', active);
+    _saveAndSetText('heroSub', heroSub, 'Check your late tokens, Wooclap credits & extension stars-nya! (ฅ^•ᴥ•^ฅ) ~desu 🐾', active);
   }
 
   // 3. Search Form helper & input label
   const formHelper = document.querySelector('#tokenForm + p, #tokenForm p.text-slate-500');
   if (formHelper) {
-    _saveAndSetText('formHelper', formHelper, "Accepts 7-digit student number with or without 's' nya~ (e.g. s1234567)! Bookmarks supported ~desu ✨", active);
+    _saveAndSetText('formHelper', formHelper, "Accepts 7-digit student number with or without 's' nya~ (e.g. s1234567)! Bookmarks supported ~desu (=^･ω･^=) 🐾", active);
   }
   const inputLabel = document.querySelector('#tokenForm span.font-mono');
   if (inputLabel) {
@@ -1333,7 +1333,7 @@ function updateKawaiiStaticTexts(active) {
   const bookmarkBanner = document.querySelector('#resultsContainer .bg-amber-50\\/70 span:not(.space-x-2 span)');
   if (bookmarkBanner) {
     const originalHtml = '<strong>Bookmark your balance:</strong> Save this URL <span class="hidden sm:inline">(or press <kbd class="px-1.5 py-0.5 font-mono text-[10px] bg-white border border-amber-300 rounded text-amber-900 shadow-2xs">Cmd/Ctrl + D</kbd>)</span> to check anytime.';
-    const kawaiiHtml = '<strong>Bookmark your balance nya~!</strong> Save this URL <span class="hidden sm:inline">(or press <kbd class="px-1.5 py-0.5 font-mono text-[10px] bg-white border border-pink-300 rounded text-pink-900 shadow-2xs">Cmd/Ctrl + D</kbd>)</span> to check anytime ~desu! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧';
+    const kawaiiHtml = '<strong>Bookmark your balance nya~!</strong> Save this URL <span class="hidden sm:inline">(or press <kbd class="px-1.5 py-0.5 font-mono text-[10px] bg-white border border-pink-300 rounded text-pink-900 shadow-2xs">Cmd/Ctrl + D</kbd>)</span> to check anytime ~desu! (ฅ^•ᴥ•^ฅ) 🐾';
     _saveAndSet('bookmarkBanner', bookmarkBanner, kawaiiHtml, active);
   }
 
@@ -1373,11 +1373,11 @@ function updateKawaiiStaticTexts(active) {
   // 8. Footer
   const footerP1 = document.querySelector('footer p.font-medium');
   if (footerP1) {
-    _saveAndSetText('footerP1', footerP1, 'Creative Technology · Module 5: Interactive Media ~desu (✿◠‿◠)', active);
+    _saveAndSetText('footerP1', footerP1, 'Creative Technology · Module 5: Interactive Media ~desu (ฅ^•ᴥ•^ฅ)', active);
   }
   const footerP2 = document.querySelector('footer p.text-\\[11px\\]');
   if (footerP2) {
-    _saveAndSetText('footerP2', footerP2, 'Zero database nya~ · Client-side hash lookup desu · Privacy protected 🐾', active);
+    _saveAndSetText('footerP2', footerP2, 'Zero database nya~ · Client-side hash lookup desu · Privacy protected 🐾 (=^･ω･^=)', active);
   }
 
   // 9. Void Controls & Return Button
@@ -1492,14 +1492,14 @@ function setMode(modeOrJuicy, updateUrl = true) {
       spawnBurstAtElement(toggleBtn, ['#fbcfe8', '#f472b6', '#fda4af', '#fce7f3', '#ffffff'], 'sakura', 24);
     }
 
-    if (ticket) ticket.setAttribute('title', 'Inspect golden ticket nya~ (✿◠‿◠)');
-    if (getxrLogo) getxrLogo.setAttribute('title', 'Inspect GETXR ~desu (* ^ ω ^)');
-    if (threedmaLogo) threedmaLogo.setAttribute('title', 'Inspect 3DMA ~desu (o˘◡˘o)');
-    if (getxrBal) getxrBal.setAttribute('title', 'Click to flip token nya! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧');
-    if (threedmaBal) threedmaBal.setAttribute('title', 'Click to flip token nya! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧');
+    if (ticket) ticket.setAttribute('title', 'Inspect golden ticket nya~ (ฅ^•ᴥ•^ฅ)');
+    if (getxrLogo) getxrLogo.setAttribute('title', 'Inspect GETXR ~desu (=^ ◡ ^=) 🐾');
+    if (threedmaLogo) threedmaLogo.setAttribute('title', 'Inspect 3DMA ~desu (ฅ’ω’ฅ) 🐾');
+    if (getxrBal) getxrBal.setAttribute('title', 'Click to flip token nya! (ฅ^•ᴥ•^ฅ) ✨');
+    if (threedmaBal) threedmaBal.setAttribute('title', 'Click to flip token nya! (ฅ^•ᴥ•^ฅ) ✨');
 
     // Kaomoji microcopy
-    if (studentInput) studentInput.placeholder = 'e.g. s1234567 (ฅ^•ﻌ•^ฅ)';
+    if (studentInput) studentInput.placeholder = 'e.g. s1234567 (ฅ^•ᴥ•^ฅ)';
     if (submitBtn) {
       const span = submitBtn.querySelector('span');
       if (span) span.textContent = 'Check-nya ✨';
@@ -1512,7 +1512,7 @@ function setMode(modeOrJuicy, updateUrl = true) {
     if (!wasKawaii) {
       const { isNew, totalFound } = _unlockTelemetry('0xdm');
       const suffix = isNew ? ` (Secret unlocked: ${totalFound}/${_0xM.length}!)` : '';
-      _notifyTelemetry(`✨ Sparkles everywhere! Kawaii Mode unlocked nya! (｡♥‿♥｡) ~desu${suffix}`);
+      _notifyTelemetry(`✨ Sparkles & purrs! Kawaii Mode unlocked nya! (ฅ^•ᴥ•^ฅ) ~desu${suffix}`);
       if (isSoundEnabled) {
         SoundEngine.playKawaiiFanfare();
       }
@@ -1942,7 +1942,7 @@ function renderCourseCard(courseKey, data) {
   if (!data || !data.enrolled) {
     if (badge) {
       badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-medium bg-slate-100 text-slate-600 border border-slate-200 shrink-0';
-      const label = isKawaiiMode ? 'Not Enrolled nya... (T_T)' : 'Not Enrolled';
+      const label = isKawaiiMode ? 'Not Enrolled nya... (=;ェ;=)' : 'Not Enrolled';
       badge.innerHTML = (isJuicyMode || isKawaiiMode)
         ? `<svg class="w-3 h-3 text-slate-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg><span>${label}</span>`
         : `<span>${label}</span>`;
@@ -1952,7 +1952,7 @@ function renderCourseCard(courseKey, data) {
     if (notEnrolledEl) {
       notEnrolledEl.classList.remove('hidden');
       const pBold = notEnrolledEl.querySelector('p.font-semibold');
-      if (pBold) pBold.textContent = isKawaiiMode ? 'Not Enrolled nya... (T_T)' : 'Not Enrolled';
+      if (pBold) pBold.textContent = isKawaiiMode ? 'Not Enrolled nya... (=;ェ;=)' : 'Not Enrolled';
     }
     if (enrolledContentEl) enrolledContentEl.classList.add('hidden');
     if (ledgerSectionEl) ledgerSectionEl.classList.add('hidden');
@@ -1978,12 +1978,12 @@ function renderCourseCard(courseKey, data) {
       if (balance >= 3.0) {
         badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-pink-100 text-pink-800 border border-pink-300 shrink-0';
         badge.innerHTML = `<svg class="w-3 h-3 text-pink-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>Stockpiler-nya! 👑</span>`;
-        badge.title = 'Vault reserve ≥ 3.0 tokens nya! Super prepared ~desu! (✿◠‿◠)';
+        badge.title = 'Vault reserve ≥ 3.0 tokens nya! Super prepared ~desu! (ฅ^•ᴥ•^ฅ)';
         if (cardEl) cardEl.classList.add(isGetxr ? 'aura-glow-gold' : 'aura-glow-indigo');
       } else if (earned > 0.0) {
         badge.className = 'inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0';
         badge.innerHTML = `<svg class="w-3 h-3 text-emerald-600 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg><span>Prepared-nya! 🌸</span>`;
-        badge.title = 'Attendance credits banked nya! Inventory bolstered ~desu!';
+        badge.title = 'Attendance credits banked nya! Inventory bolstered ~desu! (=^･ω･^=)';
         if (balance >= 2.5 && cardEl) {
           cardEl.classList.add(isGetxr ? 'aura-glow-gold' : 'aura-glow-indigo');
         }
@@ -2061,7 +2061,7 @@ function renderCourseCard(courseKey, data) {
   const transactions = (data.transactions || []).slice().reverse();
   if (transactions.length === 0) {
     ledger.innerHTML = isKawaiiMode
-      ? '<div class="text-[11px] text-pink-600 py-1">No transaction history yet nya~ (・ω・)</div>'
+      ? '<div class="text-[11px] text-pink-600 py-1">No transaction history yet nya~ (=^‥^=)</div>'
       : '<div class="text-[11px] text-slate-500 py-1">No transaction history yet.</div>';
   } else {
     transactions.forEach((tx, idx) => ledger.appendChild(createTransactionRow(tx, idx)));
@@ -2115,7 +2115,7 @@ async function performLookup(rawId, updateUrl = true) {
 
   if (!rawId) {
     showAlert(isKawaiiMode
-      ? 'Please enter your student number nya~ (e.g. s1234567) desu! (ฅ^•ﻌ•^ฅ)'
+      ? 'Please enter your student number nya~ (e.g. s1234567) desu! (ฅ^•ᴥ•^ฅ)'
       : 'Please enter your student number (e.g. 1234567 or s1234567).');
     inputEl.focus();
     return;
@@ -2152,7 +2152,7 @@ async function performLookup(rawId, updateUrl = true) {
     if (!res.ok) {
       if (res.status === 404) {
         throw new Error(isKawaiiMode
-          ? `Student number "${studentId}" was not found in the roster nya... (T_T) Please double-check or ask sensei ~desu!`
+          ? `Student number "${studentId}" was not found in the roster nya... (=;ェ;=) Please double-check or ask sensei ~desu!`
           : `Student number "${studentId}" was not found in the course roster. Please double-check the number or contact your instructor.`);
       }
       throw new Error(isKawaiiMode
@@ -2178,7 +2178,7 @@ async function performLookup(rawId, updateUrl = true) {
       else if (!isJuicyMode) modeSuffix = '?vanilla';
       history.replaceState(null, '', window.location.pathname + '#' + studentId + modeSuffix);
     }
-    document.title = isKawaiiMode ? `IM 2026 Tokens — ${studentId} ~desu ✨` : `IM 2026 Tokens — ${studentId}`;
+    document.title = isKawaiiMode ? `IM 2026 Tokens — ${studentId} nya! (ฅ^•ᴥ•^ฅ)` : `IM 2026 Tokens — ${studentId}`;
 
     resultsContainer.classList.remove('hidden');
     if (window.innerWidth < 768) {
@@ -2189,10 +2189,10 @@ async function performLookup(rawId, updateUrl = true) {
   } catch (err) {
     currentStudentId = '';
     resultsContainer.classList.add('hidden');
-    document.title = isKawaiiMode ? 'IM 2026 Token Lookup ~desu! (✿◠‿◠)' : 'IM 2026 Token Lookup';
+    document.title = isKawaiiMode ? 'IM 2026 Token Lookup ~desu! (ฅ^•ᴥ•^ฅ)' : 'IM 2026 Token Lookup';
     const isNetworkError = err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError');
     const msg = isNetworkError 
-      ? (isKawaiiMode ? 'Cannot reach server-nya! Please check your internet connection desu (´-ω-｀)' : 'Unable to connect to the server. Please check your internet connection and try again.')
+      ? (isKawaiiMode ? 'Cannot reach server-nya! Please check your internet connection desu (=^-ω-^=)' : 'Unable to connect to the server. Please check your internet connection and try again.')
       : (err.message || (isKawaiiMode ? 'An unexpected error occurred nya...' : 'An unexpected error occurred.'));
     showAlert(msg);
   } finally {
