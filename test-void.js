@@ -104,9 +104,13 @@ const SoundEngine = (() => {
       gain.gain.linearRampToValueAtTime(peakGain, t0 + Math.min(0.005, durationSec * 0.2));
       gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationSec);
 
-      src.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
+      src.onended = () => {
+        try {
+          src.disconnect();
+          filter.disconnect();
+          gain.disconnect();
+        } catch (e) {}
+      };
 
       src.start(t0);
       src.stop(t0 + durationSec + 0.015);
@@ -144,6 +148,14 @@ const SoundEngine = (() => {
       osc.connect(filter);
       filter.connect(gain);
       gain.connect(ctx.destination);
+
+      osc.onended = () => {
+        try {
+          osc.disconnect();
+          filter.disconnect();
+          gain.disconnect();
+        } catch (e) {}
+      };
 
       osc.start(t0);
       osc.stop(t0 + duration + 0.015);
@@ -1809,7 +1821,6 @@ function createParticle(x, y, colorPalette, shape = 'circle', customOpts = {}) {
 
 function spawnBurstAtElement(element, colorPalette, shape = 'circle', count = 22) {
   if (!isJuicyMode || !canvas || !ctx) return;
-  resizeCanvas();
   const rect = element.getBoundingClientRect();
   const centerX = rect.left + rect.width / 2;
   const centerY = rect.top + rect.height / 2;
@@ -2008,6 +2019,10 @@ function spawnKawaiiHeartPuff() {
 
 function animateCounter(element, targetVal) {
   if (!element) return;
+  if (element._counterRafId) {
+    cancelAnimationFrame(element._counterRafId);
+    element._counterRafId = null;
+  }
   if (!isJuicyMode) {
     element.textContent = targetVal.toFixed(1);
     return;
@@ -2031,8 +2046,9 @@ function animateCounter(element, targetVal) {
     }
 
     if (progress < 1) {
-      requestAnimationFrame(step);
+      element._counterRafId = requestAnimationFrame(step);
     } else {
+      element._counterRafId = null;
       element.textContent = targetVal.toFixed(1);
       element.classList.remove('pop-number');
       void element.offsetWidth;
@@ -2040,7 +2056,7 @@ function animateCounter(element, targetVal) {
       SoundEngine.playCounterPop(targetVal);
     }
   }
-  requestAnimationFrame(step);
+  element._counterRafId = requestAnimationFrame(step);
 }
 
 // Show alert banner
@@ -2623,12 +2639,17 @@ function _updateTelemetryUI() {
     const counterTooltip = isKawaiiMode
       ? `Secrets discovered nya: ${count}/${total} — Explore to find all ${total} ~desu! (Shift+click to reset)`
       : `Secrets discovered: ${count}/${total} — Explore the page to find all ${total}! (Shift+click to reset)`;
-    container.innerHTML = `
-      <svg class="w-3.5 h-3.5 text-amber-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-      </svg>
-      <span id="eggCounterText">${counterLabel}</span>
-    `;
+    const existingText = document.getElementById('eggCounterText');
+    if (existingText && !container.classList.contains('achievement-badge')) {
+      existingText.textContent = counterLabel;
+    } else {
+      container.innerHTML = `
+        <svg class="w-3.5 h-3.5 text-amber-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+        <span id="eggCounterText">${counterLabel}</span>
+      `;
+    }
     container.setAttribute('title', counterTooltip);
     container.onclick = (e) => {
       if (!isJuicyMode) return;
@@ -2723,7 +2744,6 @@ function _dispenseCelebrationParticles() {
     initCanvas();
   }
   if (!canvas || !ctx) return;
-  resizeCanvas();
 
   const confettiPalette = [
     '#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6', 
@@ -2797,7 +2817,6 @@ function _dispenseCelebrationParticles() {
 
 function spawnEggShatterParticles(element) {
   if (!isJuicyMode || !canvas || !ctx) return;
-  resizeCanvas();
   const rect = element.getBoundingClientRect();
   const cx = rect.left + rect.width / 2;
   const cy = rect.top + rect.height / 2;
@@ -3111,7 +3130,6 @@ function _setupUnderTheCListener() {
 
     // Aquatic bubble burst rising upward from Under the C
     if (canvas && ctx) {
-      resizeCanvas();
       const rect = link.getBoundingClientRect();
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
@@ -3135,7 +3153,6 @@ function _setupUnderTheCListener() {
 // 10. DevTools Console Guardian Cat Petting (Secret 10: "Guardian's Blessing")
 function _spawnHeartPawsBurst() {
   if (!isJuicyMode || !canvas || !ctx) return;
-  resizeCanvas();
   const palette = ['#f43f5e', '#ec4899', '#fb7185', '#f59e0b', '#fbbf24', '#e879f9'];
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -3344,7 +3361,6 @@ function _dispenseBehindCardConfetti(cardA, cardB) {
     initCanvas();
   }
   if (!canvas || !ctx) return;
-  resizeCanvas();
 
   const rectA = cardA.getBoundingClientRect();
   const rectB = cardB.getBoundingClientRect();
@@ -3736,7 +3752,6 @@ function init3DVoidModule() {
 
   function spawnPressDownImpact() {
     if (!isJuicyMode || !canvas || !ctx) return;
-    resizeCanvas();
     const rect = cachedCardRect;
     const w = rect ? rect.width : window.innerWidth;
     const h = rect ? rect.height : window.innerHeight;
@@ -4191,11 +4206,7 @@ function init3DVoidModule() {
 
   // 5. Walking & Physics Game Loop
   function applyWorldTransform() {
-    worldRig.style.transform = `
-      rotateX(${camPitch.toFixed(2)}deg)
-      rotateY(${camYaw.toFixed(2)}deg)
-      translate3d(${(-camX).toFixed(2)}px, ${(camY).toFixed(2)}px, ${(-camZ).toFixed(2)}px)
-    `;
+    worldRig.style.transform = `rotateX(${camPitch.toFixed(2)}deg) rotateY(${camYaw.toFixed(2)}deg) translate3d(${(-camX).toFixed(2)}px, ${(camY).toFixed(2)}px, ${(-camZ).toFixed(2)}px)`;
   }
 
   function startGameLoop() {

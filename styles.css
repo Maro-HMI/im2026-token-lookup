@@ -943,7 +943,6 @@ body.in-the-void #voidStarfield {
   background: #ffffff;
   border-radius: 50%;
   pointer-events: none;
-  will-change: opacity, transform;
   animation: cosmicTwinkle var(--twinkle-dur, 3s) ease-in-out infinite alternate;
 }
 
@@ -1604,7 +1603,6 @@ body.kawaii-mode.in-the-void #voidFloor {
   background-image: 
     linear-gradient(to right, rgba(244, 114, 182, 0.45) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(167, 139, 250, 0.45) 1px, transparent 1px) !important;
-  box-shadow: inset 0 0 160px rgba(244, 114, 182, 0.35);
 }
 
 body.kawaii-mode.in-the-void #floorShadow {
