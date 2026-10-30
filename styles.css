@@ -1,0 +1,2018 @@
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --border: #e2e8f0;
+  --primary: #2563eb;
+  --font-sans: "General Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", Menlo, monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.font-heading {
+  font-family: "General Sans", sans-serif;
+}
+
+/* Full-Screen Particle Canvas */
+#fxCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 900;
+}
+
+/* Base Transitions */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ==========================================================================
+   Juicy Mode Animations (Spring Physics, Glows, Staggers)
+   ========================================================================== */
+
+/* Button Squish & Spring Pop */
+body.juicy-mode #submitBtn {
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: transform;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease, box-shadow 0.18s ease;
+}
+
+@media (hover: hover) {
+  body.juicy-mode #submitBtn:hover {
+    transform: translateY(-1px) scale(1.02) translateZ(0);
+    box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.35);
+  }
+
+  body.juicy-mode #submitBtn:hover::after {
+    left: 140%;
+    transition: left 0.75s ease-in-out;
+  }
+
+  #modeToggleBtn:hover {
+    transform: scale(1.05);
+  }
+}
+
+body.juicy-mode #submitBtn:active {
+  transform: translateY(1px) scale(0.94) translateZ(0);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
+}
+
+/* Shimmer Sweep on Button */
+body.juicy-mode #submitBtn::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -75%;
+  width: 50%;
+  height: 200%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.35) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(25deg);
+  pointer-events: none;
+  transition: none;
+}
+
+/* Springy Input Focus */
+body.juicy-mode .search-input-wrap {
+  transition: border-color 0.2s ease, box-shadow 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.2s ease;
+}
+
+body.juicy-mode .search-input-wrap:focus-within {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15), 0 4px 12px -2px rgba(15, 23, 42, 0.08);
+}
+
+/* Card Spring Entrances */
+body.juicy-mode #cardGetxr {
+  animation: springCard 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+}
+
+body.juicy-mode #card3dma {
+  animation: springCard 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) 0.07s forwards;
+  opacity: 0;
+}
+
+@keyframes springCard {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Highscore Aura Glow (for balances >= 2.5) */
+body.juicy-mode .aura-glow-gold {
+  box-shadow: 0 0 0 1.5px rgba(234, 179, 8, 0.5), 0 8px 24px -4px rgba(234, 179, 8, 0.2);
+  transition: box-shadow 0.3s ease;
+}
+
+body.juicy-mode .aura-glow-indigo {
+  box-shadow: 0 0 0 1.5px rgba(99, 102, 241, 0.5), 0 8px 24px -4px rgba(99, 102, 241, 0.2);
+  transition: box-shadow 0.3s ease;
+}
+
+/* Number Pop Animation */
+@keyframes numberPop {
+  0% {
+    transform: scale(0.92);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+body.juicy-mode .pop-number {
+  display: inline-block;
+  animation: numberPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Staggered Activity Ledger Items */
+body.juicy-mode .ledger-item {
+  animation: ledgerSlideIn 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation-delay: calc(var(--item-idx, 0) * 45ms);
+  opacity: 0;
+}
+
+@keyframes ledgerSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Earned Token Glow Pulse */
+body.juicy-mode .stat-pulse-green {
+  animation: greenPulse 0.6s ease-out;
+}
+
+@keyframes greenPulse {
+  0% {
+    background-color: rgba(16, 185, 129, 0.25);
+    transform: scale(1.04);
+  }
+  100% {
+    background-color: #ffffff;
+    transform: scale(1);
+  }
+}
+
+/* Mode Toggle Button */
+#modeToggleBtn {
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#modeToggleBtn:hover {
+  transform: scale(1.05);
+}
+
+#modeToggleBtn:active {
+  transform: scale(0.95);
+}
+
+/* ==========================================================================
+   Micro-Interactions & Easter Egg Animations
+   ========================================================================== */
+
+/* Coin Flip on Balance Click */
+@keyframes coinFlip {
+  0% { transform: perspective(500px) rotateY(0deg) scale(1); }
+  50% { transform: perspective(500px) rotateY(180deg) scale(1.25); }
+  100% { transform: perspective(500px) rotateY(360deg) scale(1); }
+}
+
+.coin-flip,
+body.juicy-mode .coin-flip,
+body.vanilla-mode .coin-flip {
+  display: inline-block !important;
+  animation: coinFlip 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  transform-style: preserve-3d !important;
+  will-change: transform;
+}
+
+/* Golden Ticket Spin */
+@keyframes ticketSpin {
+  0% { transform: scale(1) rotate(0deg); }
+  35% { transform: scale(1.3) rotate(-15deg); }
+  75% { transform: scale(1.15) rotate(375deg); }
+  100% { transform: scale(1) rotate(360deg); }
+}
+
+.ticket-spin {
+  display: inline-block !important;
+  animation: ticketSpin 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  transform-origin: center center;
+}
+
+/* Course Logo Bobble */
+@keyframes logoBobble {
+  0% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.25) rotate(-15deg); }
+  50% { transform: scale(1.2) rotate(15deg); }
+  75% { transform: scale(1.1) rotate(-8deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+
+.logo-bobble {
+  animation: logoBobble 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  transform-origin: center center;
+}
+
+/* Achievement Badge Click Pulse */
+@keyframes badgeBounce {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.08); }
+  70% { transform: scale(0.96); }
+  100% { transform: scale(1); }
+}
+
+.badge-celebrate {
+  animation: badgeBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+/* Barrel Roll */
+@keyframes barrelRoll {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.barrel-rolling {
+  animation: barrelRoll 1.3s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  transform-origin: center center;
+}
+
+/* 3D Card Tilt & Specular Glint (Juicy Mode Desktop) */
+@media (hover: hover) {
+  body.juicy-mode #cardGetxr,
+  body.juicy-mode #card3dma {
+    position: relative;
+    overflow: hidden;
+    transform-style: preserve-3d;
+    transition: transform 0.12s ease-out, box-shadow 0.2s ease-out;
+  }
+
+  body.juicy-mode #cardGetxr.tilt-card-reset,
+  body.juicy-mode #card3dma.tilt-card-reset {
+    transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.5s ease;
+    transform: perspective(1200px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1);
+  }
+
+  .card-glint {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    border-radius: inherit;
+    background: radial-gradient(circle 280px at var(--glint-x, 50%) var(--glint-y, 50%), rgba(255, 255, 255, 0.25), transparent 80%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    mix-blend-mode: overlay;
+  }
+
+  body.juicy-mode #cardGetxr:hover .card-glint,
+  body.juicy-mode #card3dma:hover .card-glint {
+    opacity: 1;
+  }
+}
+
+/* Card Drag & Reorder (Juicy Mode) */
+body.juicy-mode #cardGetxr,
+body.juicy-mode #card3dma {
+  cursor: default;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  will-change: transform;
+}
+
+body.juicy-mode #cardGetxr.card-dragging,
+body.juicy-mode #card3dma.card-dragging {
+  cursor: default !important;
+  z-index: 950 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  touch-action: none !important;
+  transition: none !important;
+}
+
+body.juicy-mode #cardGetxr.card-dragging {
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 2px rgba(234, 179, 8, 0.6) !important;
+}
+
+body.juicy-mode #cardGetxr.aura-glow-gold.card-dragging {
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 2px rgba(234, 179, 8, 0.8), 0 8px 24px -4px rgba(234, 179, 8, 0.35) !important;
+}
+
+body.juicy-mode #card3dma.card-dragging {
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 2px rgba(99, 102, 241, 0.4) !important;
+}
+
+body.juicy-mode #card3dma.aura-glow-indigo.card-dragging {
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35), 0 0 0 2px rgba(99, 102, 241, 0.75), 0 8px 24px -4px rgba(99, 102, 241, 0.35) !important;
+}
+
+body.juicy-mode .card-swapping {
+  pointer-events: none;
+  z-index: 950 !important;
+}
+
+/* Interactive Micro-Interactions (Juicy Mode Only) */
+body.juicy-mode #headerTicketIcon,
+body.juicy-mode #getxrLogo,
+body.juicy-mode #threedmaLogo {
+  cursor: pointer !important;
+  transition: transform 0.2s ease;
+}
+
+body.juicy-mode #headerTicketIcon:hover,
+body.juicy-mode #getxrLogo:hover,
+body.juicy-mode #threedmaLogo:hover {
+  transform: rotate(12deg);
+}
+
+body.juicy-mode #headerTicketIcon:active,
+body.juicy-mode #getxrLogo:active,
+body.juicy-mode #threedmaLogo:active {
+  transform: scale(0.9);
+}
+
+body.juicy-mode #getxrBalance,
+body.juicy-mode #threedmaBalance {
+  cursor: pointer !important;
+  transition: opacity 0.15s ease;
+}
+
+body.juicy-mode #getxrBalance:hover,
+body.juicy-mode #threedmaBalance:hover {
+  opacity: 0.75;
+}
+
+body.juicy-mode #cardGetxr button,
+body.juicy-mode #card3dma button,
+body.juicy-mode #cardGetxr a,
+body.juicy-mode #card3dma a {
+  cursor: pointer !important;
+}
+
+/* ==========================================================================
+   Vanilla Mode & Reduced Motion Overrides
+   ========================================================================== */
+body.vanilla-mode #headerTicketIcon,
+body.vanilla-mode #getxrLogo,
+body.vanilla-mode #threedmaLogo,
+body.vanilla-mode #getxrBalance,
+body.vanilla-mode #threedmaBalance,
+body.vanilla-mode #cardGetxr,
+body.vanilla-mode #card3dma {
+  cursor: default !important;
+  transform: none !important;
+  opacity: 1 !important;
+  transition: none !important;
+}
+
+body.vanilla-mode #headerTicketIcon:hover,
+body.vanilla-mode #getxrLogo:hover,
+body.vanilla-mode #threedmaLogo:hover,
+body.vanilla-mode #getxrBalance:hover,
+body.vanilla-mode #threedmaBalance:hover,
+body.vanilla-mode #cardGetxr:hover,
+body.vanilla-mode #card3dma:hover {
+  cursor: default !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
+
+body.vanilla-mode #cardGetxr .card-glint,
+body.vanilla-mode #card3dma .card-glint {
+  display: none !important;
+}
+
+body.vanilla-mode #submitBtn,
+body.vanilla-mode #cardGetxr,
+body.vanilla-mode #card3dma,
+body.vanilla-mode .ledger-item,
+body.vanilla-mode .pop-number,
+body.vanilla-mode .coin-flip,
+body.vanilla-mode .ticket-spin,
+body.vanilla-mode .logo-bobble,
+body.vanilla-mode .barrel-rolling {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ==========================================================================
+   Telemetry & Achievement Badge
+   ========================================================================== */
+#eggCounterContainer {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  cursor: default !important;
+}
+
+#eggCounterContainer.achievement-badge {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 14px !important;
+  padding: 8px 24px 8px 10px !important;
+  border-radius: 9999px !important;
+  background: linear-gradient(135deg, #fffdf5 0%, #fef3c7 50%, #fde68a 100%) !important;
+  border: 2px solid #f59e0b !important;
+  box-shadow: 0 4px 18px -2px rgba(245, 158, 11, 0.35), 0 0 0 1px rgba(251, 191, 36, 0.4) !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease !important;
+}
+
+#eggCounterContainer.achievement-badge:hover {
+  transform: scale(1.04);
+  box-shadow: 0 6px 24px -2px rgba(245, 158, 11, 0.5), 0 0 16px 2px rgba(245, 158, 11, 0.35) !important;
+}
+
+#eggCounterContainer.achievement-badge:active {
+  transform: scale(0.97);
+}
+
+.achievement-avatar {
+  width: 56px !important;
+  height: 56px !important;
+  border-radius: 9999px !important;
+  object-fit: cover !important;
+  border: 2.5px solid #f59e0b !important;
+  box-shadow: 0 2px 8px rgba(180, 83, 9, 0.3) !important;
+  flex-shrink: 0 !important;
+  display: block !important;
+}
+
+.achievement-text-group {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  line-height: 1.25 !important;
+  text-align: left !important;
+}
+
+.achievement-label {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.08em !important;
+  color: #b45309 !important;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+.achievement-title {
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  color: #451a03 !important;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+body.vanilla-mode #eggCounterContainer,
+body.vanilla-mode .achievement-badge,
+body.vanilla-mode #easterEggToast {
+  display: none !important;
+}
+
+/* Enrolled status badges are grey for both courses in Vanilla mode */
+body.vanilla-mode #getxrStatusBadge,
+body.vanilla-mode #threedmaStatusBadge {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #e2e8f0 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.juicy-mode #submitBtn,
+  body.juicy-mode #cardGetxr,
+  body.juicy-mode #card3dma,
+  body.juicy-mode .ledger-item,
+  body.juicy-mode .pop-number,
+  body.juicy-mode .coin-flip,
+  body.juicy-mode .ticket-spin,
+  body.juicy-mode .logo-bobble,
+  .barrel-rolling {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+  }
+  body.juicy-mode #submitBtn::after {
+    display: none !important;
+  }
+  #fxCanvas {
+    display: none !important;
+  }
+}
+
+/* Custom Scrollbar for Ledger */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ==========================================================================
+   The Void (3D Perspective Sandbox & Walking Experience)
+   ========================================================================== */
+
+#appViewport {
+  width: 100%;
+  min-height: 100vh;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+body.in-the-void {
+  overflow: hidden !important;
+  background-color: var(--void-bg, #f8fafc) !important;
+  user-select: none;
+}
+
+body.in-the-void #appViewport {
+  perspective: 1100px;
+  perspective-origin: 50% 50%;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#worldRig {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  transform-style: flat;
+}
+
+body.in-the-void #worldRig {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  min-height: 0;
+  display: block;
+  flex-grow: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+#pageCard {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  position: relative;
+  transform-style: flat;
+}
+
+body.in-the-void #pageCard {
+  position: absolute;
+  width: 860px;
+  max-width: 90vw;
+  left: -430px;
+  top: -380px;
+  min-height: 0;
+  height: auto;
+  display: block;
+  flex-grow: 0;
+  transform-style: preserve-3d;
+  box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.08);
+  border-radius: 1.25rem;
+  background: transparent;
+  overflow: visible;
+}
+
+#pageFront {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-grow: 1;
+  background: #f8fafc;
+  border-radius: 0;
+  overflow-x: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(1px);
+}
+
+body.in-the-void #pageFront {
+  min-height: 720px;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.2);
+}
+
+body.in-the-void header {
+  position: relative !important;
+  top: auto !important;
+}
+
+body.in-the-void #lastUpdated {
+  display: none !important;
+}
+
+body.in-the-void footer {
+  border-bottom-left-radius: 1.25rem;
+  border-bottom-right-radius: 1.25rem;
+}
+
+/* Token Overclock kinetic effects */
+.token-overclocking {
+  display: inline-block !important;
+  animation: overclockJitter 0.08s infinite alternate !important;
+  color: #ea580c !important;
+  text-shadow: 0 0 16px rgba(234, 88, 12, 0.6), 0 0 30px rgba(245, 158, 11, 0.4) !important;
+}
+
+@keyframes overclockJitter {
+  0% { transform: scale(1.18) rotate(-2deg); }
+  50% { transform: scale(1.24) translate(1px, -1px); }
+  100% { transform: scale(1.18) rotate(2deg); }
+}
+
+/* Floor Grid */
+#voidFloor {
+  display: none;
+}
+
+body.in-the-void #voidFloor {
+  display: block;
+  position: absolute;
+  width: 5000px;
+  height: 5000px;
+  left: -2500px;
+  top: -2500px;
+  transform: rotateX(90deg) translateZ(-520px);
+  background-image: 
+    linear-gradient(to right, rgba(148, 163, 184, 0.35) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.35) 1px, transparent 1px);
+  background-size: 80px 80px;
+  mask-image: radial-gradient(circle at center, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(circle at center, black 30%, transparent 75%);
+  pointer-events: none;
+}
+
+/* Soft contact shadow beneath the card */
+#floorShadow {
+  display: none;
+}
+
+body.in-the-void #floorShadow {
+  display: block;
+  position: absolute;
+  width: 860px;
+  height: 400px;
+  left: -430px;
+  top: -200px;
+  transform: rotateX(90deg) translateZ(-510px);
+  background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.28) 0%, rgba(15, 23, 42, 0.07) 50%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Page Backside (Rear of Card) */
+#pageBackside {
+  display: none;
+}
+
+body.in-the-void #pageBackside {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  position: absolute;
+  inset: 0;
+  border-radius: 1.25rem;
+  background: radial-gradient(circle at 50% 25%, #1e293b 0%, #0f172a 100%);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  transform: rotateY(180deg) translateZ(2px);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  color: white;
+  padding: 4.5rem 2rem 2.5rem;
+  text-align: center;
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+/* Circuit pattern on back */
+#pageBackside::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: 
+    radial-gradient(rgba(59, 130, 246, 0.18) 1px, transparent 1px),
+    radial-gradient(rgba(99, 102, 241, 0.12) 1px, transparent 1px);
+  background-size: 24px 24px, 48px 48px;
+  background-position: 0 0, 12px 12px;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+/* The 3D Floating Easter Egg behind the plane */
+#easterEgg3D {
+  position: relative;
+  margin-top: 1.25rem;
+  transform: translateZ(45px);
+  transform-style: preserve-3d;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  z-index: 10;
+  transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#easterEgg3D.claimed {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateZ(45px) scale(0) rotate(20deg);
+}
+
+.egg-mesh {
+  width: 110px;
+  height: 145px;
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  background: radial-gradient(circle at 35% 30%, #fde047, #eab308 45%, #ca8a04 75%, #854d0e 100%);
+  box-shadow: 
+    0 15px 35px -5px rgba(234, 179, 8, 0.45),
+    inset -8px -8px 20px rgba(113, 63, 18, 0.6),
+    inset 8px 8px 16px rgba(254, 240, 138, 0.85);
+  border: 1.5px solid rgba(254, 240, 138, 0.6);
+  position: relative;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
+  animation: floatEgg 3.5s ease-in-out infinite alternate;
+}
+
+#easterEgg3D:hover .egg-mesh {
+  transform: scale(1.1) rotate(5deg);
+  filter: drop-shadow(0 0 20px rgba(234, 179, 8, 0.75));
+}
+
+@keyframes floatEgg {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(-3deg); }
+  100% { transform: translateY(0px) rotate(3deg); }
+}
+
+/* Glossy specular highlight on golden egg */
+.egg-mesh::before {
+  content: '';
+  position: absolute;
+  top: 18%;
+  left: 22%;
+  width: 28px;
+  height: 42px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.65) 0%, rgba(255, 255, 255, 0) 70%);
+  transform: rotate(-25deg);
+  pointer-events: none;
+}
+
+/* Return HUD Button in Lower Third */
+#voidHud {
+  display: none;
+}
+
+body.in-the-void #voidHud {
+  display: flex;
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.45);
+  border-radius: 9999px;
+  padding: 0.625rem 1.25rem;
+  color: #ffffff;
+  user-select: none;
+}
+
+#voidHud button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #f8fafc;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+#voidHud button:hover {
+  color: #60a5fa;
+}
+
+.kbd-pill {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 0.125rem 0.45rem;
+  border-radius: 0.25rem;
+  color: #cbd5e1;
+}
+
+/* Void Controls Guide Pill in Upper Center */
+#voidControlsGuide {
+  display: none;
+}
+
+body.in-the-void #voidControlsGuide {
+  display: flex;
+  position: fixed;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  padding: 0.4rem 1rem;
+  color: #94a3b8;
+  font-size: 0.75rem;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   Atmospheric Ascent to Space Subsystem (0xbk)
+   ========================================================================== */
+
+/* 1. Starfield Layer (Fixed behind 3D world in appViewport) */
+#voidStarfield {
+  display: none;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 0;
+  overflow: hidden;
+  transition: opacity 0.4s ease;
+}
+
+body.in-the-void #voidStarfield {
+  display: block;
+}
+
+.cosmic-star {
+  position: absolute;
+  background: #ffffff;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: cosmicTwinkle var(--twinkle-dur, 3s) ease-in-out infinite alternate;
+}
+
+@keyframes cosmicTwinkle {
+  0% { opacity: 0.25; transform: scale(0.8); }
+  50% { opacity: 0.95; transform: scale(1.2); }
+  100% { opacity: 0.4; transform: scale(0.9); }
+}
+
+/* 2. 3D Wispy Troposphere Clouds */
+#voidCloudContainer {
+  display: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.in-the-void #voidCloudContainer {
+  display: none; /* Controlled dynamically by JS based on altitude, hidden by default at ground */
+  transform-style: preserve-3d;
+  pointer-events: none;
+  opacity: 0;
+  transition: none;
+  will-change: opacity;
+}
+
+.void-cloud-anchor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  pointer-events: none;
+}
+
+.void-cloud {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  transform-style: preserve-3d;
+  animation: cloudDrift var(--drift-dur, 16s) ease-in-out infinite alternate;
+  animation-delay: var(--drift-delay, 0s);
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.cloud-size-sm { transform: scale3d(0.75, 0.75, 1); }
+.cloud-size-md { transform: scale3d(1.0, 1.0, 1); }
+.cloud-size-lg { transform: scale3d(1.28, 1.28, 1); }
+
+.cloud-puff {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle at 48% 34%, 
+    rgba(255, 255, 255, 0.96) 0%, 
+    rgba(255, 255, 255, 0.85) 40%, 
+    rgba(241, 245, 249, 0.6) 68%, 
+    rgba(226, 232, 240, 0.2) 85%, 
+    transparent 100%
+  );
+  filter: none;
+  -webkit-filter: none;
+}
+
+/* Wide, soft cumulus foundation base */
+.puff-base {
+  width: 520px;
+  height: 150px;
+  left: -260px;
+  top: -65px;
+  border-radius: 50% 50% 42% 42%;
+  background: radial-gradient(ellipse at 50% 42%, 
+    rgba(255, 255, 255, 0.92) 0%, 
+    rgba(248, 250, 252, 0.78) 44%, 
+    rgba(226, 232, 240, 0.4) 72%, 
+    rgba(226, 232, 240, 0.15) 86%, 
+    transparent 100%
+  );
+  filter: none;
+  -webkit-filter: none;
+}
+
+/* Grand center dome */
+.puff-center {
+  width: 250px;
+  height: 220px;
+  left: -125px;
+  top: -155px;
+  filter: none;
+  -webkit-filter: none;
+}
+
+/* Left billowing lobe */
+.puff-left {
+  width: 195px;
+  height: 175px;
+  left: -215px;
+  top: -115px;
+  filter: none;
+  -webkit-filter: none;
+}
+
+/* Right billowing lobe */
+.puff-right {
+  width: 215px;
+  height: 185px;
+  left: 25px;
+  top: -125px;
+  filter: none;
+  -webkit-filter: none;
+}
+
+/* Extra top accent crest for natural asymmetry */
+.puff-crest {
+  width: 160px;
+  height: 150px;
+  left: -40px;
+  top: -180px;
+  filter: none;
+  -webkit-filter: none;
+}
+
+@keyframes cloudDrift {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(30px, -18px, 25px); }
+}
+
+/* 3. Altimeter Telemetry HUD (Upper Left) */
+#voidAltimeter {
+  display: none;
+}
+
+body.in-the-void #voidAltimeter {
+  display: flex;
+  position: fixed;
+  top: 1.5rem;
+  left: 1.5rem;
+  z-index: 1000;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+body.in-the-void #voidAltimeter.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.altimeter-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0.875rem;
+  padding: 0.5rem 0.85rem;
+  box-shadow: 0 15px 30px -5px rgba(0, 0, 0, 0.4);
+  min-width: 175px;
+  user-select: none;
+}
+
+.altimeter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.altimeter-zone-badge {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 9999px;
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.altimeter-climb-arrow {
+  font-size: 0.7rem;
+  color: #38bdf8;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.altimeter-climb-arrow.descending {
+  transform: rotate(180deg);
+  color: #f59e0b;
+}
+
+.altimeter-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.altimeter-label {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.altimeter-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+}
+
+.altimeter-unit {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: #cbd5e1;
+}
+
+.altimeter-gauge-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.altimeter-gauge-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #38bdf8, #818cf8, #c084fc);
+  border-radius: 9999px;
+  transition: width 0.1s linear;
+}
+
+/* 4. Cosmic Guardian Cat in Orbit (Multi-Tier Altitude Chase) */
+#cosmicCat3D {
+  display: none;
+}
+
+body.in-the-void #cosmicCat3D {
+  display: block;
+  position: absolute;
+  width: 130px;
+  height: 140px;
+  left: -65px;
+  top: -70px;
+  transform: translate3d(0px, -4000px, -160px);
+  transform-style: preserve-3d;
+  cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
+  transition: opacity 0.4s ease;
+}
+
+body.in-the-void #cosmicCat3D.cat-fleeing {
+  transition: transform 1.25s cubic-bezier(0.2, 0.95, 0.35, 1.15), opacity 0.45s ease 0.85s !important;
+  pointer-events: none;
+}
+
+.cosmic-cat-mesh {
+  transform-style: preserve-3d;
+  animation: cosmicFloat 4.2s ease-in-out infinite alternate;
+}
+
+body.in-the-void #cosmicCat3D.claimed .cosmic-cat-helmet {
+  border-color: #fbbf24;
+  box-shadow: 0 0 35px rgba(251, 191, 36, 0.8), inset 0 0 20px rgba(251, 191, 36, 0.4);
+}
+
+@keyframes cosmicFloat {
+  0% { transform: translate3d(0px, 0px, 0px) rotateY(0deg) rotateZ(-3deg); }
+  50% { transform: translate3d(20px, -35px, 20px) rotateY(12deg) rotateZ(3deg); }
+  100% { transform: translate3d(-15px, 20px, -20px) rotateY(-8deg) rotateZ(-2deg); }
+}
+
+.cosmic-cat-helmet {
+  position: relative;
+  width: 105px;
+  height: 105px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.45) 0%, rgba(56, 189, 248, 0.25) 45%, rgba(15, 23, 42, 0.75) 100%);
+  border: 2px solid rgba(56, 189, 248, 0.75);
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.55), inset 0 0 16px rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+#cosmicCat3D:hover .cosmic-cat-helmet {
+  transform: scale(1.12);
+  border-color: #38bdf8;
+  box-shadow: 0 0 40px rgba(56, 189, 248, 0.9), inset 0 0 25px rgba(255, 255, 255, 0.5);
+}
+
+.cat-helmet-glare {
+  position: absolute;
+  top: 12px;
+  left: 18px;
+  width: 28px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.65);
+  border-radius: 50%;
+  transform: rotate(-35deg);
+  filter: blur(1px);
+  pointer-events: none;
+}
+
+.cat-ears-container {
+  display: flex;
+  justify-content: space-between;
+  width: 58px;
+  margin-bottom: 2px;
+}
+
+.cat-ear {
+  color: #f1f5f9;
+  font-size: 13px;
+  line-height: 1;
+  text-shadow: 0 0 6px rgba(56, 189, 248, 0.8);
+  animation: earTwitch 3.5s ease-in-out infinite;
+}
+
+@keyframes earTwitch {
+  0%, 90%, 100% { transform: rotate(0deg); }
+  92% { transform: rotate(-8deg); }
+  94% { transform: rotate(6deg); }
+  96% { transform: rotate(0deg); }
+}
+
+.cat-ear.right {
+  animation-delay: 0.4s;
+}
+
+.cat-face-text {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.9), 0 0 20px rgba(99, 102, 241, 0.7);
+  letter-spacing: -0.05em;
+  white-space: nowrap;
+}
+
+.cat-antenna {
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.cat-antenna-beacon {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+  animation: antennaBlink 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes antennaBlink {
+  0% { background: #38bdf8; box-shadow: 0 0 4px #38bdf8; }
+  100% { background: #4ade80; box-shadow: 0 0 12px #4ade80; }
+}
+
+.cosmic-cat-badge {
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #cbd5e1;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 9999px;
+  padding: 0.2rem 0.65rem;
+  letter-spacing: 0.04em;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* 5. Superhero Landing Screen Shake */
+.superhero-shake {
+  animation: superheroImpact 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both !important;
+}
+
+@keyframes superheroImpact {
+  0% { transform: translateY(0px); }
+  15% { transform: translateY(16px) scale(0.98); }
+  30% { transform: translateY(-10px) scale(1.01); }
+  45% { transform: translateY(7px) scale(0.99); }
+  60% { transform: translateY(-4px); }
+  80% { transform: translateY(2px); }
+  100% { transform: translateY(0px); }
+}
+
+/* ==========================================================================
+   6. 3D Void Gravity Mode (Secret #12: 0xcl) — Physics Slabs
+   ========================================================================== */
+
+/* 3D Void Physics Slabs (Secret #12: Gravity Mode) */
+#voidPhysicsContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  transform-style: preserve-3d;
+  z-index: 40;
+}
+
+.void-physics-slab {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-style: preserve-3d;
+  will-change: transform;
+  border-radius: 1.1rem;
+  overflow: visible;
+  backface-visibility: visible;
+  -webkit-backface-visibility: visible;
+  user-select: none;
+  pointer-events: auto;
+  cursor: grab;
+  /* Extruded physical slab 3D thickness with multi-stop bevel depth */
+  box-shadow: 
+    0 1px 0 #94a3b8,
+    0 2px 0 #94a3b8,
+    0 3px 0 #64748b,
+    0 4px 0 #64748b,
+    0 5px 0 #475569,
+    0 6px 0 #475569,
+    0 7px 0 #334155,
+    0 8px 0 #1e293b,
+    0 10px 0 #0f172a,
+    0 16px 28px rgba(15, 23, 42, 0.45),
+    0 26px 50px rgba(15, 23, 42, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: white;
+}
+
+/* Specular bevel rim highlight on top edge */
+.void-physics-slab::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 1.15rem;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 40%, rgba(15, 23, 42, 0.2) 100%);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.void-physics-slab.restoring {
+  transition: transform 0.82s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.82s ease;
+}
+
+.void-physics-slab .slab-content {
+  width: 100%;
+  height: 100%;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: white;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   Kawaii Mode (カワイイ モード) — Secret #13 (0xdm)
+   ========================================================================== */
+
+body.kawaii-mode {
+  background: radial-gradient(circle at 50% 0%, #fdf2f8 0%, #f5f3ff 45%, #f0fdf4 100%) fixed !important;
+  color: #4c1d95 !important;
+}
+
+body.kawaii-mode ::selection {
+  background: #fbcfe8 !important;
+  color: #831843 !important;
+}
+
+/* Extra pillowy cards with soft pink aura shadows */
+body.kawaii-mode #pageFront,
+body.kawaii-mode #cardGetxr,
+body.kawaii-mode #card3dma,
+body.kawaii-mode .altimeter-card {
+  border-radius: 1.5rem !important;
+  border-color: #fbcfe8 !important;
+  box-shadow: 0 16px 36px -6px rgba(244, 114, 182, 0.22), 0 0 0 1px rgba(244, 114, 182, 0.2) !important;
+}
+
+/* Pillowy Capsule Search Bar in Kawaii Mode */
+body.kawaii-mode .search-input-wrap {
+  border-radius: 9999px !important;
+  border-color: #fbcfe8 !important;
+  box-shadow: 0 16px 36px -6px rgba(244, 114, 182, 0.22), 0 0 0 1px rgba(244, 114, 182, 0.2) !important;
+  padding: 4px 6px 4px 10px !important;
+  overflow: visible !important;
+}
+
+body.kawaii-mode .search-input-wrap:focus-within {
+  border-color: #f472b6 !important;
+  box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.25), 0 16px 36px -6px rgba(244, 114, 182, 0.22) !important;
+}
+
+/* Navigation bar */
+body.kawaii-mode header {
+  border-color: #fce7f3 !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* Cat Ears on Course Cards */
+body.kawaii-mode #cardGetxr,
+body.kawaii-mode #card3dma {
+  position: relative !important;
+  overflow: visible !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.kawaii-mode #cardGetxr::before,
+body.kawaii-mode #card3dma::before {
+  content: '';
+  position: absolute;
+  top: -24px;
+  left: 26px;
+  width: 28px;
+  height: 25px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 26' fill='none'%3E%3Cpath d='M2 26 C3 14 8 2 14 2 C20 2 25 14 26 26 Z' fill='%23f472b6'/%3E%3Cpath d='M7 25 C8 16 11 8 14 8 C17 8 20 16 21 25 Z' fill='%23fdf2f8'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  transform: rotate(-10deg);
+  transform-origin: bottom center;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 2px 4px rgba(244, 114, 182, 0.4));
+  z-index: 10;
+  pointer-events: none;
+}
+
+body.kawaii-mode #cardGetxr::after,
+body.kawaii-mode #card3dma::after {
+  content: '';
+  position: absolute;
+  top: -24px;
+  right: 26px;
+  width: 28px;
+  height: 25px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 26' fill='none'%3E%3Cpath d='M2 26 C3 14 8 2 14 2 C20 2 25 14 26 26 Z' fill='%23f472b6'/%3E%3Cpath d='M7 25 C8 16 11 8 14 8 C17 8 20 16 21 25 Z' fill='%23fdf2f8'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  transform: rotate(10deg);
+  transform-origin: bottom center;
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  filter: drop-shadow(0 2px 4px rgba(244, 114, 182, 0.4));
+  z-index: 10;
+  pointer-events: none;
+}
+
+body.kawaii-mode #cardGetxr:hover::before,
+body.kawaii-mode #card3dma:hover::before {
+  transform: rotate(-22deg) scale(1.15);
+}
+
+body.kawaii-mode #cardGetxr:hover::after,
+body.kawaii-mode #card3dma:hover::after {
+  transform: rotate(22deg) scale(1.15);
+}
+
+/* Blushing icons and animated cheek glow */
+body.kawaii-mode #getxrLogo,
+body.kawaii-mode #threedmaLogo {
+  filter: drop-shadow(0 0 8px rgba(244, 114, 182, 0.65));
+  animation: kawaiiCheekGlow 2.5s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes kawaiiCheekGlow {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.06); }
+}
+
+/* Pastel Tokens Display Box */
+body.kawaii-mode .bg-slate-50\/80 {
+  background: rgba(253, 242, 248, 0.85) !important;
+  border-color: #fbcfe8 !important;
+}
+
+body.kawaii-mode #getxrBalance,
+body.kawaii-mode #threedmaBalance {
+  color: #db2777 !important;
+  text-shadow: 0 0 14px rgba(244, 114, 182, 0.4);
+}
+
+/* Mode Button Glow */
+body.kawaii-mode #modeToggleBtn {
+  border-color: #f472b6 !important;
+  background: #fdf2f8 !important;
+  box-shadow: 0 0 14px rgba(244, 114, 182, 0.5) !important;
+  color: #db2777 !important;
+}
+
+/* Search Submit Button */
+body.kawaii-mode #submitBtn {
+  border: none !important;
+  outline: none !important;
+  border-radius: 9999px !important;
+  background-color: #ec4899 !important;
+  background-image: linear-gradient(135deg, #ec4899 0%, #db2777 100%) !important;
+  box-shadow: 0 3px 12px rgba(236, 72, 153, 0.35) !important;
+  padding: 7px 16px !important;
+  -webkit-backface-visibility: hidden !important;
+  backface-visibility: hidden !important;
+  transform: translateZ(0) !important;
+  will-change: transform !important;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+body.kawaii-mode #submitBtn:hover {
+  background-color: #f472b6 !important;
+  background-image: linear-gradient(135deg, #f472b6 0%, #ec4899 100%) !important;
+  box-shadow: 0 5px 18px rgba(236, 72, 153, 0.5) !important;
+  transform: scale(1.02) translateZ(0) !important;
+}
+body.kawaii-mode #submitBtn:active {
+  transform: scale(0.97) translateZ(0) !important;
+}
+body.kawaii-mode #submitBtn::after {
+  display: none !important;
+}
+
+/* Kawaii 3D Void Crossover: The Candy Cloud Dimension */
+body.kawaii-mode.in-the-void #voidFloor {
+  background-image: 
+    linear-gradient(to right, rgba(244, 114, 182, 0.45) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(167, 139, 250, 0.45) 1px, transparent 1px) !important;
+}
+
+body.kawaii-mode.in-the-void #floorShadow {
+  background: radial-gradient(ellipse at center, rgba(244, 114, 182, 0.4) 0%, rgba(192, 132, 252, 0.18) 40%, transparent 70%) !important;
+}
+
+body.kawaii-mode.in-the-void .cloud-puff {
+  background: radial-gradient(circle at 38% 32%, 
+    #ffffff 0%, 
+    #fce7f3 40%, 
+    rgba(245, 208, 254, 0.8) 65%, 
+    rgba(244, 114, 182, 0.32) 84%, 
+    transparent 100%
+  ) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  -webkit-filter: none !important;
+}
+
+body.kawaii-mode.in-the-void .puff-base {
+  background: radial-gradient(ellipse at 50% 42%, 
+    #ffffff 0%, 
+    #fce7f3 44%, 
+    rgba(245, 208, 254, 0.75) 68%, 
+    rgba(244, 114, 182, 0.28) 85%, 
+    transparent 100%
+  ) !important;
+}
+
+body.kawaii-mode.in-the-void #easterEgg3D .egg-mesh {
+  background: radial-gradient(circle at 35% 25%, #ffffff 0%, #f472b6 40%, #db2777 85%, #9d174d 100%) !important;
+  box-shadow: 0 0 35px rgba(244, 114, 182, 0.85), 0 0 70px rgba(236, 72, 153, 0.45) !important;
+}
+
+/* ==========================================================================
+   Secret #14: Under the C
+   ========================================================================== */
+.under-c-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.secret-under-c-hit {
+  position: absolute;
+  left: -8px;
+  right: -8px;
+  top: 40%;
+  bottom: -22px;
+  cursor: default;
+  z-index: 15;
+  text-decoration: none;
+  background: transparent;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body.juicy-mode .secret-under-c-hit,
+body.kawaii-mode .secret-under-c-hit {
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   Secret #15: The Superluminal Chase & Guardian Cat Catch (0xfo)
+   ========================================================================== */
+
+/* 1. Speed Lines Canvas Overlay (Over 9000 State) */
+.companion-perch {
+  display: block; position: relative; width: 62px; height: 52px;
+  margin: 0 12px -8px auto; padding: 0; border: 0; background: transparent;
+  cursor: pointer; z-index: 2;
+}
+.companion-perch[hidden] { display: none; }
+.companion-helmet {
+  display: flex; align-items: center; justify-content: center;
+  width: 48px; height: 48px; border-radius: 50%; border: 2px solid #fbbf24;
+  background: radial-gradient(circle at 35% 25%, #475569, #0f172a 70%);
+  color: #fff; font: 7px monospace; white-space: nowrap; box-shadow: 0 0 12px #fbbf2466;
+}
+.companion-medal { position: absolute; right: 7px; bottom: 5px; color: #fbbf24; font-size: 17px; text-shadow: 0 1px 3px #0f172a; }
+.companion-perch:focus-visible { outline: 2px solid #38bdf8; outline-offset: 4px; border-radius: 50%; }
+.chase-descent-status { position: absolute; left: 50%; top: max(120px, 16%); transform: translateX(-50%); text-align: center; background: #0f172ad9; color: white; border-radius: 1rem; padding: 0.6rem 1rem; }
+.chase-descent-status[hidden] { display: none; }
+.chase-descent-status strong { display: block; font: 700 20px monospace; white-space: nowrap; }
+.chase-descent-status span { display: block; margin-top: 0.25rem; font-size: 12px; white-space: nowrap; }
+.chase-descending .chase-boost-container, .chase-descending .chase-controls-guide, .chase-descending .chase-flight-caption { visibility: hidden; }
+body.cosmic-chase-active.cosmic-landing-active #appViewport { visibility: visible; }
+body.cosmic-landing-active #appViewport { animation: companionTouchdown 0.3s ease-out; }
+@keyframes companionTouchdown {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-4px, 5px); }
+  45% { transform: translate(3px, -3px); }
+  70% { transform: translate(-2px, 1px); }
+}
+@media (prefers-reduced-motion: reduce) { body.cosmic-landing-active #appViewport { animation: none; } }
+#hyperSpeedCanvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 45;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+body.in-the-void.hyper-speed-active #hyperSpeedCanvas {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #hyperSpeedCanvas { display: none; }
+}
+
+.hyper-speed-active {
+  box-shadow: inset 0 0 80px rgba(56, 189, 248, 0.4), inset 0 0 160px rgba(168, 85, 247, 0.25) !important;
+}
+
+body.kawaii-mode.hyper-speed-active {
+  box-shadow: inset 0 0 80px rgba(244, 114, 182, 0.5), inset 0 0 160px rgba(251, 191, 36, 0.3) !important;
+}
+
+/* 2. Cosmic Chase Overlay & Fullscreen Viewport */
+#cosmicChaseOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  overflow: hidden;
+  background: #020208;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: crosshair;
+  touch-action: none;
+  outline: none;
+}
+
+#cosmicChaseOverlay.hidden {
+  display: none !important;
+}
+
+#cosmicChaseCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.chase-page-approach {
+  position: absolute; left: 50%; top: 50%; width: 100%; height: 100%;
+  z-index: 1; pointer-events: none; overflow: hidden;
+  background: #f8fafc; border-radius: 16px; box-shadow: 0 20px 80px #02061766;
+  transform-origin: center; will-change: transform, opacity;
+}
+.chase-page-approach[hidden] { display: none; }
+body.in-the-void .chase-page-approach #pageFront {
+  min-height: 100%; height: 100%; border-radius: 0; transform: none;
+  overflow: hidden;
+}
+.chase-companion-layer {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  z-index: 2; pointer-events: none;
+}
+
+/* 3. Hyperspace Whiteout Warp Flash */
+#warpFlashOverlay {
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  opacity: 0;
+  pointer-events: none;
+  transition: none;
+  z-index: 10;
+}
+
+#warpFlashOverlay.active {
+  opacity: 1;
+  transition: none;
+}
+
+/* 4. Cockpit Flight HUD */
+.chase-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 1.5rem;
+  z-index: 20;
+}
+
+.chase-hud-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+body.cosmic-chase-active #appViewport,
+body.cosmic-chase-active #voidStarfield,
+body.cosmic-chase-active #voidAltimeter,
+body.cosmic-chase-active #voidControlsGuide,
+body.cosmic-chase-active #returnToScreenBtn,
+body.cosmic-chase-active #fxCanvas,
+body.cosmic-chase-active #hyperSpeedCanvas {
+  visibility: hidden;
+}
+
+.chase-flight-caption {
+  align-self: center;
+  margin-top: auto;
+  margin-bottom: 1.2rem;
+  text-align: center;
+  color: #cbd5e1;
+}
+.chase-flight-caption span { display: block; font: 10px monospace; letter-spacing: 0.18em; color: #94a3b8; margin-bottom: 0.4rem; }
+.chase-flight-caption strong { font-size: 14px; font-weight: 500; }
+.chase-flight-caption small { display: block; margin-top: 0.5rem; color: #94a3b8; font-size: 10px; }
+.chase-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; }
+.chase-abort-btn:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 4px; }
+.chase-hud .chase-boost-container { margin-top: 0.8rem; }
+.chase-event { min-height: 1.2em; margin: 0.35rem 0; color: #e2e8f0; font-size: 12px; text-align: center; text-shadow: 0 1px 5px #020208; }
+.chase-title-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+  border-radius: 9999px;
+  padding: 0.4rem 1rem;
+  color: #38bdf8;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.chase-abort-btn {
+  min-height: 44px;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  padding: 0.35rem 0.85rem;
+  color: #94a3b8;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chase-abort-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+
+/* 5. Boost Pods Gauge */
+.chase-boost-container {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.chase-boost-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: #94a3b8;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+}
+
+.chase-boost-pods {
+  display: flex;
+  gap: 0.6rem;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  padding: 0.4rem 0.85rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.boost-pod {
+  font-size: 1.15rem;
+  color: rgba(255, 255, 255, 0.2);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: scale(0.9);
+}
+
+.boost-pod.active {
+  color: #fbbf24;
+  text-shadow: 0 0 16px rgba(251, 191, 36, 0.9), 0 0 30px rgba(245, 158, 11, 0.6);
+  transform: scale(1.25);
+  animation: boostPulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes boostPulse {
+  0% { transform: scale(1.2); }
+  100% { transform: scale(1.35); filter: brightness(1.2); }
+}
+
+/* 6. Live Telemetry Readout */
+.chase-telemetry-readout {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.chase-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  padding: 0.35rem 0.85rem;
+  backdrop-filter: blur(6px);
+}
+
+.chase-stat-label {
+  font-size: 0.58rem;
+  color: #64748b;
+  letter-spacing: 0.08em;
+}
+
+.chase-stat-val {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.chase-controls-guide {
+  align-self: center;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+  padding: 0.35rem 1rem;
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+/* Kawaii Mode styling overrides for chase */
+body.kawaii-mode .chase-title-badge {
+  border-color: rgba(244, 114, 182, 0.5);
+  box-shadow: 0 0 20px rgba(244, 114, 182, 0.3);
+  color: #f472b6;
+}
+
+body.kawaii-mode .boost-pod.active {
+  color: #f472b6;
+  text-shadow: 0 0 16px rgba(244, 114, 182, 0.9), 0 0 30px rgba(236, 72, 153, 0.6);
+}
+
+body.kawaii-mode .chase-stat-val {
+  color: #f472b6;
+}
+
+/* Responsive and reduced-motion rules follow the base chase styles. */
+@media (max-width: 520px) {
+  .chase-hud { padding: 1rem 0.65rem; }
+  .chase-title-badge { padding: 0.4rem 0.6rem; font-size: 0.6rem; }
+  .chase-hud-header { align-items: flex-start; }
+  .chase-actions { max-width: 48%; }
+  .chase-controls-guide { text-align: center; border-radius: 0.75rem; font-size: 0.65rem; }
+}
+@media (max-height: 450px) {
+  .chase-hud { padding: 0.5rem 0.65rem; }
+  .chase-flight-caption { margin-bottom: 0.4rem; }
+  .chase-flight-caption span { display: none; }
+}
+@media (max-height: 300px) {
+  .chase-descent-status { top: 60px; padding: 0.3rem 0.5rem; }
+  .chase-descent-status strong { font-size: 14px; }
+  .chase-flight-caption { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boost-pod.active { animation: none !important; }
+}
+.chase-approaching-page .chase-descent-status {
+  top: auto; left: 1rem; bottom: 1rem; transform: none;
+}
+.chase-reduced-motion .boost-pod.active { animation: none !important; }
+body.chase-reduced-motion.cosmic-landing-active #appViewport { animation: none; }
+
+
+
+
+
+
