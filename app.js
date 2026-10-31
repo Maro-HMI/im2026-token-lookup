@@ -2829,7 +2829,7 @@ function _sigKey(k) {
   return '';
 }
 
-function _notifyTelemetry(message) {
+function _notifyTelemetry(message, duration = 3500) {
   if (!isJuicyMode) return;
 
   let toast = document.getElementById('easterEggToast');
@@ -2859,7 +2859,7 @@ function _notifyTelemetry(message) {
   toastTimeout = setTimeout(() => {
     toast.classList.remove('opacity-100', 'translate-y-0');
     toast.classList.add('opacity-0', '-translate-y-4');
-  }, 3500);
+  }, duration);
 }
 
 function _dispenseCelebrationParticles() {
@@ -3799,6 +3799,8 @@ function init3DVoidModule() {
     return {
       altitude: camY,
       over9000: isOver9000,
+      chaseStarting: pendingChaseIntro,
+      hyperNoticeRemaining,
       chase: chaseSession ? chaseSession.status() : null,
       music: SoundEngine.getNyanCatMusicStatus(),
       feedback: SoundEngine.getChaseFeedbackStatus(),
@@ -3840,6 +3842,9 @@ function init3DVoidModule() {
 
   // One overlay, drawn by the existing Void loop; no extra animation loop.
   let isOver9000 = false;
+  let hyperNoticeRemaining = 0;
+  let hyperNoticeLastTick = null;
+  let pendingChaseIntro = false;
   let hyperPreview = null;
   let chaseSession = null;
   let finalCatEncounterArmed = true;
@@ -3864,6 +3869,14 @@ function init3DVoidModule() {
       _notifyTelemetry('Reload the page to load the flight view.');
       return;
     }
+    if (hyperNoticeRemaining > 0) {
+      pendingChaseIntro = true;
+      camY = getCatAltitude();
+      camVy = 0;
+      clearFlightKeys();
+      return;
+    }
+    pendingChaseIntro = false;
     finalCatEncounterArmed = false;
     lastChaseLanding = null;
     landingCelebration = false;
@@ -3928,6 +3941,8 @@ function init3DVoidModule() {
     if (chaseSession) return window.__getSpaceStatus();
     chaseReducedPreview = options?.reducedMotion === true;
     window.__previewOver9000(9500);
+    // This explicit local shortcut skips the natural encounter's reading pause.
+    hyperNoticeRemaining = 0;
     startCosmicChase();
     return window.__getSpaceStatus();
   };
@@ -3948,9 +3963,30 @@ function init3DVoidModule() {
 
   function resetHyperState() {
     isOver9000 = false;
+    hyperNoticeRemaining = 0;
+    hyperNoticeLastTick = null;
+    pendingChaseIntro = false;
     document.body.classList.remove('hyper-speed-active');
     SoundEngine.setHyperHumActive(false);
   }
+
+  function advanceHyperNotice(now) {
+    if (hyperNoticeLastTick !== null && !document.hidden) {
+      hyperNoticeRemaining = Math.max(0, hyperNoticeRemaining - Math.max(0, Math.min(100, now - hyperNoticeLastTick)));
+    }
+    hyperNoticeLastTick = now;
+  }
+
+  function showHyperNotice() {
+    _notifyTelemetry(isKawaiiMode
+      ? "⚡ IT'S OVER 9000 nya?! Power level maximum ~desu! (=^･ω･^=)🐾"
+      : "⚡ IT'S OVER 9000! Hyper state engaged!", Math.max(4500, hyperNoticeRemaining + 300));
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    hyperNoticeLastTick = performance.now();
+    if (!document.hidden && isOver9000 && hyperNoticeRemaining > 0) showHyperNotice();
+  });
 
   function updateHyperState(y) {
     if (chaseSession) { SoundEngine.setHyperHumActive(false); return; }
@@ -3960,6 +3996,8 @@ function init3DVoidModule() {
     }
     if (!isOver9000 && y >= 9000) {
       isOver9000 = true;
+      hyperNoticeRemaining = 4200;
+      hyperNoticeLastTick = performance.now();
       document.body.classList.add('hyper-speed-active');
       if (getCosmicCatStage() < 4) {
         setCosmicCatStage(4);
@@ -3968,13 +4006,12 @@ function init3DVoidModule() {
         isCatFleeing = false;
         initCosmicCatPosition();
       }
-      _notifyTelemetry(isKawaiiMode
-        ? "⚡ IT'S OVER 9000 nya?! Power level maximum ~desu! (=^･ω･^=)🐾"
-        : "⚡ IT'S OVER 9000! Hyper state engaged!");
+      showHyperNotice();
       SoundEngine.playOver9000Surge();
     } else if (isOver9000 && y < 8950) {
       resetHyperState();
     }
+    if (isOver9000) advanceHyperNotice(performance.now());
     SoundEngine.setHyperHumActive(isOver9000);
     if (!isOver9000 || !hyperCtx || reducedMotion.matches || document.hidden) return;
 
@@ -4562,6 +4599,17 @@ function init3DVoidModule() {
 
     function loop() {
       if (!isInTheVoid || chaseSession) { gameLoopRafId = null; return; }
+      // Hold the encounter while the achievement is readable, without losing contact.
+      if (pendingChaseIntro) {
+        clearFlightKeys();
+        camY = getCatAltitude();
+        camVy = 0;
+        updateAtmosphericVisuals(camY, camVy);
+        applyWorldTransform();
+        if (hyperNoticeRemaining === 0) startCosmicChase();
+        if (!chaseSession) gameLoopRafId = requestAnimationFrame(loop);
+        return;
+      }
       const previousCatPosition = { x: camX, y: camY, z: camZ };
 
       const isRunning = Boolean(
@@ -4767,19 +4815,25 @@ function init3DVoidModule() {
   let pendingCatContactStage = null;
   let lastCantCatchMeTime = 0;
 
+  function orbitalCatDistance(x, y, z, altitude) {
+    // The ascent starts 810 units behind the cat; retain that whole flight column.
+    return Math.hypot(x / 1100, (y - altitude) / 300, (z + 160) / 1100);
+  }
+
   function checkOrbitalCatContact(previous) {
     if (!isInTheVoid || !isJuicyMode || chaseSession || !cosmicCat3D) return;
     const catAlt = getCatAltitude();
     if (catAlt > getSpaceCeiling()) return;
     const stage = getCosmicCatStage();
-    const catDist = Math.hypot(camX, camY - catAlt, camZ + 160);
-    if (catDist >= 380) finalCatEncounterArmed = true;
+    const catDist = orbitalCatDistance(camX, camY, camZ, catAlt);
+    if (catDist >= 1.5) finalCatEncounterArmed = true;
     // Test the whole movement segment so a fast ascent cannot skip contact.
-    const dx = camX - previous.x, dy = camY - previous.y, dz = camZ - previous.z;
+    const px = previous.x / 1100, py = (previous.y - catAlt) / 300, pz = (previous.z + 160) / 1100;
+    const dx = (camX - previous.x) / 1100, dy = (camY - previous.y) / 300, dz = (camZ - previous.z) / 1100;
     const lengthSquared = dx * dx + dy * dy + dz * dz;
     const t = lengthSquared ? Math.max(0, Math.min(1,
-      (-previous.x * dx + (catAlt - previous.y) * dy + (-160 - previous.z) * dz) / lengthSquared)) : 0;
-    const touched = Math.hypot(previous.x + dx * t, previous.y + dy * t - catAlt, previous.z + dz * t + 160) < 260;
+      -(px * dx + py * dy + pz * dz) / lengthSquared)) : 0;
+    const touched = Math.hypot(px + dx * t, py + dy * t, pz + dz * t) < 1;
     if (isCatFleeing) {
       if (touched) pendingCatContactStage = stage;
       return;
@@ -4811,10 +4865,10 @@ function init3DVoidModule() {
       if (isCatFleeing || cosmicCat3D.classList.contains('claimed')) return;
       const catAlt = getCatAltitude();
       const ceiling = getSpaceCeiling();
-      const catDist = Math.hypot(camX - 0, (camY - catAlt), camZ - (-160));
+      const catDist = orbitalCatDistance(camX, camY, camZ, catAlt);
       
       // If player cannot currently reach the cat's altitude or is too far below
-      if (catAlt > ceiling || catDist >= 380) {
+      if (catAlt > ceiling || catDist >= 1.5) {
         triggerCantCatchMeToast();
         return;
       }
