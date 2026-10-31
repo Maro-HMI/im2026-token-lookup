@@ -1,5 +1,5 @@
 /* Canvas chase and atmospheric return, with cancellable input/audio ownership. */
-function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSoundToggle, onAudioState, onLaunch, onPickup, onCollision, onCaught, onPlunge, onDescent, onLanding, onFeedbackStop, onExit }) {
+function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSoundToggle, onAudioState, onLaunch, onPickup, onCollision, onNearMiss = () => {}, onLock = () => {}, onCaught, onPlunge, onDescent, onLanding, onFeedbackStop, onExit }) {
   const overlay = document.createElement('section');
   overlay.id = 'cosmicChaseOverlay';
   overlay.tabIndex = -1;
@@ -24,9 +24,22 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
         <span class="chase-boost-label">BOOSTS <b id="chaseBoostCount">0 / 5</b></span>
         <div class="chase-boost-pods" aria-hidden="true">${'<span class="boost-pod">★</span>'.repeat(5)}</div>
         <p class="chase-event" role="status" aria-live="polite">Collect rings to catch up.</p>
+        <progress class="chase-capture-progress" max="1" value="0" aria-label="Guardian catch progress" hidden></progress>
+        <div class="chase-live-stats" aria-hidden="true"><span class="chase-speed">1.0×</span><span class="chase-pattern">Follow the rainbow</span><span class="chase-clock">0:00</span></div>
       </div>
-      <div class="chase-flight-caption"><span>GUARDIAN SIGNAL</span><strong>Collect 5 rings · Dodge asteroids</strong><small>Music: Nyan Cat · daniwell</small></div>
+      <div class="chase-flight-caption"><span>GUARDIAN SIGNAL</span><strong>Follow the rainbow · Collect 5 boosts · Catch the cat</strong><small>Near miss = slipstream boost · Music: Nyan Cat · daniwell</small></div>
       <p class="chase-controls-guide">Steer: WASD / arrows · Mouse / touch</p>
+    </div>
+    <div class="chase-results" hidden>
+      <div class="chase-result-card">
+        <div class="chase-result-paw" aria-hidden="true">🐾</div>
+        <p class="chase-result-eyebrow">COSMIC COMPANION · HOME SAFE</p>
+        <h2 id="chaseResultTitle">Guardian rescued!</h2>
+        <p class="chase-result-badge"></p>
+        <dl class="chase-result-stats"><div><dt>Chase time</dt><dd class="result-time"></dd></div><div><dt>Best on this device</dt><dd class="result-best"></dd><small class="result-best-note"></small></div><div><dt>Near misses</dt><dd class="result-near"></dd></div><div><dt>Impacts</dt><dd class="result-hits"></dd></div></dl>
+        <p class="chase-result-message">The guardian is home. Your companion is waiting on the tracker.</p>
+        <button class="chase-result-done" type="button">Return to tracker</button>
+      </div>
     </div>`;
   document.body.appendChild(overlay);
   const canvas = overlay.querySelector('canvas');
@@ -65,8 +78,34 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
   const boostPods = [...overlay.querySelectorAll('.boost-pod')];
   const eventLine = overlay.querySelector('.chase-event');
   const descentHUD = overlay.querySelector('.chase-descent-status');
+  const hud = overlay.querySelector('.chase-hud');
+  const captureMeter = overlay.querySelector('.chase-capture-progress');
+  const resultsPanel = overlay.querySelector('.chase-results');
+  const doneButton = overlay.querySelector('.chase-result-done');
+  const speedLabel = overlay.querySelector('.chase-speed');
+  const patternLabel = overlay.querySelector('.chase-pattern');
+  const clockLabel = overlay.querySelector('.chase-clock');
+  let result = null, chaseElapsed = 0, hitStop = 0, lockStep = 0, feedbackTime = 0, securedCatPoint = null;
+  const catTrail = [], cursorTrail = [];
+  const formatTime = ms => `${Math.floor(ms / 60000)}:${(ms / 1000 % 60).toFixed(2).padStart(5, '0')}`;
+  function showResults() {
+    let storage;
+    try { storage = window.localStorage; } catch (_) {}
+    result = recordChaseResult(storage || { getItem: () => null, setItem() {} }, { ...gameState, elapsed: chaseElapsed });
+    phase = 'results'; overlay.style.opacity = '1'; hud.hidden = true; resultsPanel.hidden = false;
+    overlay.setAttribute('aria-labelledby', 'chaseResultTitle');
+    resultsPanel.querySelector('.chase-result-badge').textContent = result.perfect ? '★ Purrfect pursuit · No collisions' : 'Catch confirmed · Safe landing';
+    resultsPanel.querySelector('.result-time').textContent = formatTime(result.durationMs);
+    resultsPanel.querySelector('.result-best').textContent = formatTime(result.bestMs);
+    resultsPanel.querySelector('.result-best-note').textContent = result.personalBest ? 'New personal best!' : '';
+    resultsPanel.querySelector('.result-near').textContent = String(result.nearMisses);
+    resultsPanel.querySelector('.result-hits').textContent = String(result.hits);
+    onFeedbackStop(); onAudioState(false); keys.clear();
+    ctx.clearRect(0, 0, width, height); companionCtx?.clearRect(0, 0, width, height);
+    doneButton.focus({ preventScroll: true });
+  }
   let finale = null, finaleState = null, landingTarget = null;
-  const focusButtons = [soundButton, exitButton];
+  const focusButtons = [soundButton, exitButton, doneButton];
   const game = createChaseGameplay();
   let gameState = game.status();
   let catDepth = 750;
@@ -144,7 +183,7 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
     }
     if (event.key === 'Escape' && event.type === 'keydown') {
       event.preventDefault();
-      close();
+      close(phase === 'results' ? 'completed' : 'aborted');
       return;
     }
     if (focusButtons.includes(event.target) && (event.key === 'Enter' || event.code === 'Space')) return;
@@ -163,7 +202,7 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
   }
 
   function point(event) {
-    if (phase !== 'flying' && phase !== 'warping') return;
+    if (phase !== 'flying' && phase !== 'warping' && phase !== 'capturing') return;
     if (event.type === 'pointermove' && event.pointerType !== 'mouse' && !event.buttons) return;
     const rect = canvas.getBoundingClientRect();
     const bounds = flightBounds(rect.width, rect.height);
@@ -189,7 +228,7 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
   }
 
   function resume() {
-    if (!closed && !document.hidden && raf === null) raf = requestAnimationFrame(frame);
+    if (!closed && phase !== 'results' && !document.hidden && raf === null) raf = requestAnimationFrame(frame);
   }
 
   function drawCat(cx, cy, kawaii, factor = 1, painter = ctx) {
@@ -197,7 +236,7 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
     painter.translate(cx, cy);
     painter.rotate(motion.matches ? 0 : Math.sin(time * 1.6) * 0.08);
     const scale = Math.min(1, width / 650, height / 450) * Math.min(2.8, 750 / catDepth * 0.72);
-    const fittedScale = finale && phase !== 'overdrive' ? Math.min(scale, height * 0.15 / 45) : scale;
+    const fittedScale = finale || phase === 'capturing' ? Math.min(scale, height * 0.13 / 45) : scale;
     painter.scale(fittedScale * factor, fittedScale * factor);
     painter.shadowColor = kawaii ? '#f9a8d4' : '#7dd3fc';
     painter.shadowBlur = 24;
@@ -215,7 +254,11 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
     painter.fillText('▲', -20, -7); painter.fillText('▲', 20, -7);
     painter.fillStyle = '#ffffff'; painter.font = '800 13px "JetBrains Mono", Menlo, monospace';
     painter.shadowColor = '#38bdf8'; painter.shadowBlur = 10;
-    painter.fillText('(=^･ω･^=)', 0, 12);
+    painter.fillText(finale && phase !== 'overdrive' ? '(=˘ω˘=)' : '(=^･ω･^=)', 0, 12);
+    if (finale && phase !== 'overdrive') {
+      painter.strokeStyle = kawaii ? '#f9a8d4' : '#fcd34d'; painter.lineWidth = 5;
+      painter.beginPath(); painter.ellipse(0, 35, 27, 12, 0, 0, Math.PI * 1.8); painter.stroke();
+    }
     painter.shadowBlur = 0;
     painter.strokeStyle = '#ffffff80'; painter.lineWidth = 4;
     painter.beginPath(); painter.arc(-3, -3, 35, 3.6, 4.7); painter.stroke();
@@ -252,8 +295,8 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
         ctx.fillStyle = '#fff7bf';
         ctx.beginPath(); ctx.arc(r, 0, Math.max(2, r * 0.12), 0, Math.PI * 2); ctx.fill();
       } else {
-        ctx.fillStyle = isKawaii() ? '#c4b5fd' : '#64748b';
-        ctx.strokeStyle = isKawaii() ? '#ede9fe' : '#94a3b8'; ctx.lineWidth = 1.5;
+        ctx.fillStyle = '#713645';
+        ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 1.5;
         ctx.beginPath();
         for (let i = 0; i < 8; i++) {
           const angle = i * Math.PI / 4;
@@ -262,9 +305,9 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
           else ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
         }
         ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = isKawaii() ? '#a78bfa' : '#334155';
+        ctx.fillStyle = '#452b3c';
         ctx.beginPath(); ctx.moveTo(-r * 0.7, r * 0.3); ctx.lineTo(r * 0.35, -r * 0.5); ctx.lineTo(r * 0.6, r * 0.5); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = isKawaii() ? '#ddd6fe' : '#475569';
+        ctx.fillStyle = '#a95b54';
         for (let i = 0; i < 3; i++) {
           ctx.beginPath(); ctx.arc((i - 1) * r * 0.35, Math.sin(i * 4) * r * 0.4, r * 0.13, 0, Math.PI * 2); ctx.fill();
         }
@@ -273,41 +316,46 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
     }
   }
 
+  function catPosition() {
+    return projectChaseEntity({ ...gameState.cat, z: phase === 'capturing' ? 180 : Math.max(180, catDepth), radius: 0 }, width, height);
+  }
+
   function drawDepthTrail(cx, cy, kawaii) {
-    const ribbon = kawaii ? ['#f9a8d4', '#fdba74', '#fde68a', '#86efac', '#7dd3fc', '#c4b5fd'] : ['#38bdf8', '#818cf8', '#c084fc'];
-    // Older exhaust is nearer the pursuing camera. Project it at decreasing Z,
-    // with the cat's earlier path, so the ribbon widens toward the viewer.
-    const t = motion.matches ? 0 : time;
-    const weave = 1 - gameState.boosts / 6;
-    ribbon.forEach((color, lane) => {
-      for (let i = 0; i < 36; i++) {
-        ctx.strokeStyle = color;
-        ctx.globalAlpha = 0.5 * (1 - i / 42);
-        ctx.beginPath();
-        for (let j = i; j <= i + 1; j++) {
-          const age = j / 36 * 1.25;
-          const depthScale = 750 / (750 - age * 430);
-          const laneX = (lane - (ribbon.length - 1) / 2) * 4;
-          const progress = age / 1.25;
-          // The pursuit corridor converges on the cat and opens toward the
-          // player's foreground, rather than extending sideways like a flag.
-          const pastX = Math.sin((t - (motion.matches ? 0 : age)) * 0.8) * width * 0.12 * weave;
-          const px = cx + pastX * (1 - progress) + (width / 2 - cx) * progress + laneX * depthScale;
-          const py = cy + ((motion.matches ? 0 : Math.cos((t - age) * 1.1) * height * 0.07 * weave) + 28 + age * 65) * depthScale;
-          ctx.lineWidth = 3.5 * depthScale;
-          if (j === i) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-        }
-        ctx.stroke();
+    const colors = kawaii ? ['#f9a8d4', '#fdba74', '#fde68a', '#86efac', '#7dd3fc', '#c4b5fd'] : ['#38bdf8', '#818cf8', '#c084fc'];
+    const history = motion.matches ? [{ ...gameState.cat, at: time }, { ...gameState.cat, at: time - 1 }] : catTrail;
+    const head = catPosition();
+    colors.forEach((color, lane) => {
+      ctx.strokeStyle = color;
+      for (let i = 1; i < history.length; i++) {
+        const a = history[i - 1], b = history[i];
+        const age = Math.max(0, time - a.at), nextAge = Math.max(0, time - b.at);
+        const project = (point, age) => {
+          const z = Math.max(100, catDepth - age * 300);
+          const p = projectChaseEntity({ ...point, z, radius: 0 }, width, height);
+          const t = Math.min(1, age / 1.5);
+          return { x: p.x * (1 - t) + width / 2 * t + (lane - (colors.length - 1) / 2) * (3 + age * 5), y: p.y + 25 + age * height * 0.34 };
+        };
+        const p = i === 1 ? { x: head.x + (lane - (colors.length - 1) / 2) * 3, y: head.y + 25 } : project(a, age);
+        const q = project(b, nextAge);
+        ctx.globalAlpha = Math.max(0, 0.6 - age * 0.3); ctx.lineWidth = 3 + age * 6;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke();
       }
     });
     ctx.globalAlpha = 1;
   }
 
   function render(dt) {
+    if (phase === 'results') return;
     companionCtx?.clearRect(0, 0, width, height);
     if (finaleState && phase !== 'overdrive') {
       updateReturningPage();
-      drawChaseFinale(ctx, { width, height, state: finaleState, time, kawaii: isKawaii(), reducedMotion: motion.matches, landingTarget }, (x, y, scale) => drawCat(x, y, isKawaii(), scale, companionCtx || ctx));
+      drawChaseFinale(ctx, { width, height, state: finaleState, time, kawaii: isKawaii(), reducedMotion: motion.matches, landingTarget }, (x, y, scale) => {
+        if (!securedCatPoint) securedCatPoint = { x, y };
+        const ease = motion.matches ? 1 : 1 - Math.exp(-12 * dt);
+        securedCatPoint.x += (x - securedCatPoint.x) * ease;
+        securedCatPoint.y += (y - securedCatPoint.y) * ease;
+        drawCat(securedCatPoint.x, securedCatPoint.y, isKawaii(), scale, companionCtx || ctx);
+      });
       if (phase === 'landing') overlay.style.opacity = String(1 - finaleState.progress);
       return;
     }
@@ -327,7 +375,7 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
     ctx.strokeStyle = accent;
     for (const star of stars) {
       const oldZ = star.z;
-      star.z -= dt * (motion.matches ? 35 : 1100 * gameState.speedMultiplier + launchRush * 800);
+      star.z -= dt * (hitStop > 0 ? 0.12 : 1) * (motion.matches ? 35 : 1100 * gameState.speedMultiplier + launchRush * 800);
       if (star.z < 25) { star.z = 1500; continue; }
       const sx = cx + star.x * focal / star.z, sy = cy + star.y * focal / star.z;
       ctx.globalAlpha = Math.min(0.95, 1 - star.z / 1700);
@@ -355,15 +403,25 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
       ctx.globalAlpha = 1;
     }
     drawDepthTrail(cx, cy, kawaii);
-    const weave = 1 - gameState.boosts / 6;
-    drawCat(cx + (motion.matches ? 0 : Math.sin(time * 0.8) * width * 0.12 * weave), cy + (motion.matches ? 0 : Math.cos(time * 1.1) * height * 0.07 * weave), kawaii);
+    const catPoint = catPosition();
+    if (phase !== 'capturing') drawCat(catPoint.x, catPoint.y, kawaii, 1 + (motion.matches ? 0 : boostRush * 0.09));
     ctx.restore();
 
     drawEntities();
+    if (phase === 'capturing') {
+      drawCat(catPoint.x, catPoint.y, kawaii);
+      const radius = Math.min(88, height * 0.17, width * 0.24);
+      ctx.save(); ctx.strokeStyle = '#ffffff40'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(catPoint.x, catPoint.y, radius, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#fcd34d'; ctx.shadowColor = '#fcd34d'; ctx.shadowBlur = 16;
+      ctx.beginPath(); ctx.arc(catPoint.x, catPoint.y, radius, -Math.PI / 2, -Math.PI / 2 + gameState.capture * Math.PI * 2); ctx.stroke(); ctx.restore();
+    }
     for (const effect of feedback) {
       ctx.save(); ctx.globalAlpha = Math.max(0, 1 - effect.age / 0.6);
-      ctx.strokeStyle = effect.type === 'boost' ? '#fcd34d' : '#7dd3fc'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(effect.x, effect.y, 20 + effect.age * 140, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = effect.type === 'boost' ? '#fcd34d' : effect.type === 'nearMiss' ? '#67e8f9' : '#fb7185'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(effect.x, effect.y, motion.matches ? 32 : 20 + effect.age * 140, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = ctx.strokeStyle; ctx.font = '700 15px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+      ctx.fillText(effect.type === 'boost' ? 'BOOST!' : effect.type === 'nearMiss' ? 'CLOSE CALL · +22%' : 'SHIELD!', effect.x, effect.y - 35 - (motion.matches ? 0 : effect.age * 55));
       if (effect.type === 'boost' && !motion.matches) {
         ctx.fillStyle = '#fcd34d';
         for (let i = 0; i < 12; i++) {
@@ -379,6 +437,11 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
     // The flight reticle stays independent of the cat's teasing path.
     const bounds = flightBounds();
     const px = bounds.cx + x * bounds.rx, py = bounds.cy + y * bounds.ry;
+    if (!motion.matches) {
+      ctx.save(); ctx.strokeStyle = gameState.slipstream ? '#67e8f9' : '#7dd3fc'; ctx.lineWidth = 3;
+      cursorTrail.forEach((point, i) => { if (!i) return; ctx.globalAlpha = (i / cursorTrail.length) * 0.45; ctx.beginPath(); ctx.moveTo(cursorTrail[i - 1].x, cursorTrail[i - 1].y); ctx.lineTo(point.x, point.y); ctx.stroke(); });
+      ctx.restore();
+    }
     if (gameState.protected) {
       ctx.save(); ctx.strokeStyle = '#7dd3fc'; ctx.lineWidth = 3; ctx.globalAlpha = 0.7;
       ctx.setLineDash([9, 6]); ctx.beginPath(); ctx.arc(px, py, 40, motion.matches ? 0 : time * 3, (motion.matches ? 0 : time * 3) + Math.PI * 2); ctx.stroke(); ctx.restore();
@@ -396,13 +459,16 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
     raf = null;
     if (closed || document.hidden) return;
     const began = performance.now();
-    const dt = previousTime === null ? 0 : Math.min((now - previousTime) / 1000, 0.05);
+    const frameSeconds = previousTime === null ? 0 : Math.max(0, (now - previousTime) / 1000);
+    const dt = Math.min(frameSeconds, 0.05);
     previousTime = now;
+    if (phase === 'results') return;
     time += dt;
+    if (phase === 'flying' || phase === 'capturing') chaseElapsed += frameSeconds;
     const dx = Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'));
     const dy = Number(keys.has('KeyS') || keys.has('ArrowDown')) - Number(keys.has('KeyW') || keys.has('ArrowUp'));
     const length = Math.max(1, Math.hypot(dx, dy));
-    if (phase === 'flying') {
+    if (phase === 'flying' || phase === 'capturing') {
       targetX = Math.max(-1, Math.min(1, targetX + dx / length * dt * 2.8));
       targetY = Math.max(-1, Math.min(1, targetY + dy / length * dt * 2.8));
     }
@@ -413,36 +479,63 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
     x += (targetX - x) * ease; y += (targetY - y) * ease;
     hitShake = Math.max(0, hitShake - dt);
     boostRush = Math.max(0, boostRush - dt);
+    hitStop = Math.max(0, hitStop - dt);
+    feedbackTime = Math.max(0, feedbackTime - dt);
+    if (!feedbackTime) delete hud.dataset.feedback;
     for (let i = feedback.length - 1; i >= 0; i--) {
       feedback[i].age += dt;
       if (feedback[i].age > 0.6) feedback.splice(i, 1);
     }
-    if (phase === 'flying') {
-      const events = game.update(dt, { x, y }, { width, height, safeTop });
+    if (phase === 'flying' || phase === 'capturing') {
+      const events = game.update(hitStop > 0 ? dt * 0.12 : dt, { x, y }, { width, height, safeTop, reducedMotion: motion.matches });
       gameState = game.status();
       for (const event of events) {
         if (event.type === 'boost' || event.type === 'hit') {
           feedback.push({ ...event, age: 0 });
+          hud.dataset.feedback = event.type; feedbackTime = 0.3;
           updateBoostHUD();
           if (event.type === 'boost') {
             boostRush = 0.45;
+            hitStop = motion.matches ? 0 : 0.045;
             eventLine.textContent = `Boost ${event.boosts} / 5 · Closing in!`;
             onPickup(event.boosts);
           } else {
             hitShake = 0.23;
+            hitStop = motion.matches ? 0 : 0.085;
             eventLine.textContent = event.lostBoost ? 'Asteroid hit · One boost lost. Keep flying!' : 'Asteroid hit · Shield recovering.';
             onCollision();
           }
+        } else if (event.type === 'nearMiss') {
+          feedback.push({ ...event, age: 0 });
+          boostRush = 0.6; hud.dataset.feedback = 'near'; feedbackTime = 0.4;
+          eventLine.textContent = 'Close call! Slipstream +22%'; onNearMiss(event.side);
+        } else if (event.type === 'inReach') {
+          phase = 'capturing'; overlay.classList.add('chase-capturing'); captureMeter.hidden = false;
+          eventLine.textContent = 'Cat in reach! Keep your reticle on the guardian.';
         } else if (event.type === 'miss') {
           eventLine.textContent = 'Ring missed · Another is on its way.';
         } else if (event.type === 'caught') {
+          securedCatPoint = catPosition();
           finale = createChaseFinale({ reducedMotion: motion.matches });
           finaleState = finale.status(); phase = 'overdrive'; keys.clear();
           overlay.classList.add('chase-finalising');
-          eventLine.textContent = 'Hyperdrive · Guardian Cat in reach!';
+          overlay.classList.remove('chase-capturing'); captureMeter.hidden = true;
+          eventLine.textContent = 'Guardian caught! Hyperdrive home!';
           exitButton.textContent = 'Cancel descent · Esc';
         }
       }
+      if (phase === 'capturing') {
+        captureMeter.value = gameState.capture;
+        const step = Math.floor(gameState.capture * 4);
+        if (step > lockStep) { onLock(gameState.capture); lockStep = step; }
+      }
+      if (!catTrail.length || time - catTrail[0].at >= 0.045) catTrail.unshift({ ...gameState.cat, at: time });
+      while (catTrail.length > 36) catTrail.pop();
+      const b = flightBounds(); cursorTrail.push({ x: b.cx + x * b.rx, y: b.cy + y * b.ry });
+      if (cursorTrail.length > 16) cursorTrail.shift();
+      speedLabel.textContent = `${gameState.speedMultiplier.toFixed(1)}×${gameState.slipstream ? ' SLIPSTREAM' : ''}`;
+      patternLabel.textContent = phase === 'capturing' ? 'Hold on the cat to catch' : gameState.pattern;
+      clockLabel.textContent = formatTime(chaseElapsed * 1000);
     }
     if (finale) {
       const previousPhase = phase;
@@ -466,7 +559,7 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
         overlay.style.background = 'transparent';
         exitButton.textContent = 'Return to screen · Esc';
       }
-      if (finaleState.complete) { close('completed'); return; }
+      if (finaleState.complete) { showResults(); return; }
     }
     catDepth += (gameState.catDepth - catDepth) * (1 - Math.exp(-5 * dt));
     if (phase === 'warping') {
@@ -475,7 +568,7 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
       flash.style.opacity = motion.matches ? 0 : (time < 0.25 ? time / 0.25 : Math.max(0, 1 - (time - 0.25) / 0.3));
       if (time >= duration) { phase = 'flying'; overlay.style.opacity = '1'; flash.style.opacity = '0'; }
     }
-    onAudioState(phase === 'flying' || phase === 'overdrive', gameState.boosts);
+    onAudioState(phase === 'flying' || phase === 'capturing' || phase === 'overdrive', gameState.boosts);
     const soundLabel = isSoundOn() ? 'Mute music' : 'Enable music';
     if (soundButton.textContent !== soundLabel) soundButton.textContent = soundLabel;
     render(dt);
@@ -497,6 +590,7 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
   canvas.addEventListener('pointermove', point, options);
   exitButton.addEventListener('click', close, options);
   soundButton.addEventListener('click', onSoundToggle, options);
+  doneButton.addEventListener('click', () => close('completed'), options);
   const updateMotion = () => document.body.classList.toggle('chase-reduced-motion', motion.matches);
   preference.addEventListener?.('change', updateMotion, options);
   updateMotion();
@@ -508,6 +602,6 @@ function createCosmicChase({ reducedMotion = false, isKawaii, isSoundOn, onSound
   resume();
   return {
     close,
-    status: () => ({ phase, x, y, targetX, targetY, bank, frames, width, height, paused: raf === null, stars: stars.length, reducedMotion: motion.matches, fps, renderMs: measuredFrames ? workMs / measuredFrames : 0, peakRenderMs: peakWorkMs, game: game.status(), finale: finale?.status() || null })
+    status: () => ({ phase, x, y, targetX, targetY, bank, frames, width, height, paused: raf === null, stars: stars.length, result, trailPoints: catTrail.length, reducedMotion: motion.matches, fps, renderMs: measuredFrames ? workMs / measuredFrames : 0, peakRenderMs: peakWorkMs, game: game.status(), finale: finale?.status() || null })
   };
 }

@@ -1985,6 +1985,38 @@ body.kawaii-mode .chase-stat-val {
 }
 
 /* Responsive and reduced-motion rules follow the base chase styles. */
+.chase-live-stats { display: flex; justify-content: center; gap: 1rem; margin-top: .7rem; color: #cbd5e1; font: 11px var(--font-mono); }
+.chase-speed { color: #67e8f9; font-weight: 800; }
+.chase-pattern { min-width: 10em; text-align: center; }
+.chase-capture-progress { display: block; width: min(240px, 65vw); height: 8px; margin: .6rem auto; accent-color: #fcd34d; border-radius: 999px; overflow: hidden; }
+.chase-capture-progress[hidden], .chase-hud[hidden], .chase-results[hidden], .chase-finalising .chase-capture-progress { display: none; }
+.chase-capturing .chase-flight-caption, .chase-capturing .chase-controls-guide { visibility: hidden; }
+.chase-capturing .chase-boost-label, .chase-capturing .chase-boost-pods { display: none; }
+.chase-hud[data-feedback="boost"] .chase-boost-pods { filter: drop-shadow(0 0 12px #fcd34d); }
+.chase-hud[data-feedback="near"] .chase-speed { color: white; text-shadow: 0 0 18px #22d3ee; }
+.chase-hud[data-feedback="hit"] .chase-event { color: #fda4af; }
+.chase-results { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; padding: 20px; overflow-y: auto; background: #020617a8; backdrop-filter: blur(6px); cursor: default; }
+.chase-result-card { box-sizing: border-box; width: min(470px, 100%); padding: clamp(20px, 4vh, 36px); text-align: center; border: 1px solid #7dd3fc88; border-radius: 24px; color: #f8fafc; background: radial-gradient(ellipse at top, #19314f, #0b1328 75%); box-shadow: 0 0 80px #38bdf825, 0 30px 100px #02061788; animation: chase-result-arrival .45s cubic-bezier(.2,.8,.2,1) both; }
+.chase-result-paw { font-size: 38px; margin-bottom: 8px; }
+.chase-result-eyebrow { font: 10px var(--font-mono); letter-spacing: .15em; color: #7dd3fc; }
+.chase-result-card h2 { margin: 10px 0; font: 800 clamp(25px, 5vw, 36px) var(--font-sans); letter-spacing: -.035em; }
+.chase-result-badge { display: inline-block; margin: 4px 0 18px; padding: 7px 11px; border: 1px solid #fcd34d55; border-radius: 999px; color: #fde68a; background: #fcd34d0d; font-size: 12px; }
+.chase-result-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0; }
+.chase-result-stats div { padding: 12px 5px; border-radius: 12px; background: #ffffff06; border: 1px solid #ffffff0a; }
+.chase-result-stats dt { font-size: 11px; color: #94a3b8; }
+.chase-result-stats dd { margin: 5px 0 0; font: 700 17px var(--font-mono); color: #e0f2fe; }
+.result-best-note { font-size: 10px; color: #fde68a; }
+.chase-result-message { margin: 16px 0; font-size: 12px; color: #cbd5e1; line-height: 1.6; }
+.chase-result-done { min-height: 46px; width: 100%; border-radius: 12px; background: #bae6fd; color: #0c1a30; border: 1px solid #e0f2fe; font-weight: 800; padding: 12px; cursor: pointer; transition: background .15s, transform .15s; }
+.chase-result-done:hover { background: white; }
+.chase-result-done:active { transform: scale(.98); }
+.chase-result-done:focus-visible { outline: 3px solid #fcd34d; outline-offset: 4px; }
+body.kawaii-mode .chase-result-card { background: radial-gradient(ellipse at top, #452d50, #171528 75%); border-color: #f9a8d488; }
+body.kawaii-mode .chase-result-done { background: #fbcfe8; }
+@keyframes chase-result-arrival { from { opacity: 0; transform: translateY(16px) scale(.94); } to { opacity: 1; transform: none; } }
+@media (max-height: 500px) { .chase-result-card { padding: 14px 20px; } .chase-result-paw { display: none; } .chase-result-card h2 { font-size: 24px; margin: 4px; } .chase-result-stats div { padding: 6px; } .chase-result-badge { margin-bottom: 8px; } .chase-result-message { margin: 8px 0; } }
+@media (prefers-reduced-motion: reduce) { .chase-result-card { animation: none; } .chase-result-done { transition: none; } }
+.chase-reduced-motion .chase-result-card { animation: none; }
 @media (max-width: 520px) {
   .chase-hud { padding: 1rem 0.65rem; }
   .chase-title-badge { padding: 0.4rem 0.6rem; font-size: 0.6rem; }

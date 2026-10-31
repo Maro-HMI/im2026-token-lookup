@@ -73,6 +73,17 @@ function createChaseAudio(ctx) {
   }
 
   return {
+    nearMiss(side = 0) {
+      side = Math.max(-1, Math.min(1, side));
+      const at = ctx.currentTime;
+      tone(180, { at, endFreq: 650, duration: 0.2, release: 0.12, gain: 0.12, type: 'sine', pan: side * 0.8 });
+      tone(1100, { at: at + 0.06, endFreq: 1800, duration: 0.1, gain: 0.055, pan: -side * 0.5 });
+      shimmer(at, 0.1, true);
+    },
+    lock(progress) {
+      const note = [493.88, 622.25, 739.99, 830.61, 987.77][Math.max(0, Math.min(4, Math.floor(progress * 4)))];
+      tone(note, { duration: 0.07, release: 0.08, gain: 0.07, type: 'sine' });
+    },
     descent() {
       ensureBus();
       const at = ctx.currentTime;
@@ -95,7 +106,7 @@ function createChaseAudio(ctx) {
     },
     pickup(boosts) {
       const at = ctx.currentTime;
-      const root = 493.88 * Math.pow(2, [0, 2, 4, 7, 12][Math.max(0, Math.min(4, boosts - 1))]);
+      const root = 493.88 * Math.pow(2, [0, 2, 4, 7, 12][Math.max(0, Math.min(4, boosts - 1))] / 12);
       [1, 1.25, 1.5].forEach((ratio, i) => tone(root * ratio, { at: at + i * 0.035, gain: 0.1, pan: (i - 1) * 0.35 }));
       tone(85, { at, endFreq: 170, duration: 0.13, gain: 0.12, type: 'sine' });
       shimmer(at, 0.06);

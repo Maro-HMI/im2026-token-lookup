@@ -99,6 +99,7 @@ const SoundEngine = (() => {
     if (!chaseFeedback) chaseFeedback = createChaseAudio(ctx);
     if (method === 'pickup') nyanMusic?.duck(0.65, 0.25);
     if (method === 'collision') nyanMusic?.duck(0.5, 0.35);
+    if (method === 'nearMiss') nyanMusic?.duck(0.7, 0.2);
     chaseFeedback[method](...args);
   }
 
@@ -185,6 +186,8 @@ const SoundEngine = (() => {
       playChaseCue('collision');
     },
     playChaseCatch() { playChaseCue('caught'); },
+    playChaseNearMiss(side) { playChaseCue('nearMiss', side); },
+    playChaseLock(progress) { playChaseCue('lock', progress); },
     playChaseDescent() { playChaseCue('descent'); },
     playChaseLanding() { playChaseCue('landing'); },
     stopChaseFeedback() { chaseFeedback?.stop(); },
@@ -3895,6 +3898,8 @@ function init3DVoidModule() {
       onLaunch: () => SoundEngine.playChaseLaunch(),
       onPickup: boosts => SoundEngine.playChasePickup(boosts),
       onCollision: () => SoundEngine.playChaseCollision(),
+      onNearMiss: side => SoundEngine.playChaseNearMiss(side),
+      onLock: progress => SoundEngine.playChaseLock(progress),
       onCaught: () => SoundEngine.playChaseCatch(),
       onPlunge: () => SoundEngine.playChaseDescent(),
       onDescent: altitude => { camY = altitude; camVy = 0; },
