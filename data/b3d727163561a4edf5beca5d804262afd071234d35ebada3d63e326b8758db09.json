@@ -1,0 +1,55 @@
+{
+  "student_hash": "b3d727163561a4edf5beca5d804262afd071234d35ebada3d63e326b8758db09",
+  "last_updated": "2026-11-17T19:19:38.271763+00:00",
+  "courses": {
+    "GETXR": {
+      "enrolled": true,
+      "base": 2.0,
+      "earned": 0.5,
+      "spent": 17.0,
+      "balance": 0.0,
+      "transactions": [
+        {
+          "date": "2026-09-01",
+          "type": "BASE",
+          "delta": 2.0,
+          "reason": "Initial Starting Allocation"
+        },
+        {
+          "date": "2026-09-21",
+          "type": "SPENT",
+          "delta": -1.0,
+          "reason": "A2 late sub"
+        },
+        {
+          "date": "2026-09-28",
+          "type": "EARNED",
+          "delta": 0.5,
+          "reason": "Wooclap S8"
+        },
+        {
+          "date": "2026-09-29",
+          "type": "SPENT",
+          "delta": -1.0,
+          "reason": "A3 late sub"
+        },
+        {
+          "date": "2026-10-12",
+          "type": "SPENT",
+          "delta": -2.0,
+          "reason": "A4 late sub"
+        },
+        {
+          "date": "2026-10-26",
+          "type": "SPENT",
+          "delta": -13.0,
+          "reason": "A5 late sub"
+        }
+      ]
+    },
+    "3DMA": {
+      "enrolled": false,
+      "reason": "Not enrolled in this course."
+    }
+  }
+}

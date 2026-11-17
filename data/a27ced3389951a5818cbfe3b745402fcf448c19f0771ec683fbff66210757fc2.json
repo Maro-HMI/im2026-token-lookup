@@ -1,0 +1,37 @@
+{
+  "student_hash": "a27ced3389951a5818cbfe3b745402fcf448c19f0771ec683fbff66210757fc2",
+  "last_updated": "2026-11-17T19:19:38.271763+00:00",
+  "courses": {
+    "GETXR": {
+      "enrolled": true,
+      "base": 2.0,
+      "earned": 0.0,
+      "spent": 13.0,
+      "balance": 0.0,
+      "transactions": [
+        {
+          "date": "2026-09-01",
+          "type": "BASE",
+          "delta": 2.0,
+          "reason": "Initial Starting Allocation"
+        },
+        {
+          "date": "2026-10-20",
+          "type": "SPENT",
+          "delta": -8.0,
+          "reason": "A5 late sub"
+        },
+        {
+          "date": "2026-10-25",
+          "type": "SPENT",
+          "delta": -5.0,
+          "reason": "A6 late sub"
+        }
+      ]
+    },
+    "3DMA": {
+      "enrolled": false,
+      "reason": "Not enrolled in this course."
+    }
+  }
+}
